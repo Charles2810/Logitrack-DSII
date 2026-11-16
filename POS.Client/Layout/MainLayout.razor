@@ -1,0 +1,185 @@
+﻿@inherits LayoutComponentBase
+@implements IDisposable
+@inject AuthenticationStateProvider AuthProvider
+@inject JwtAuthenticationStateProvider JwtAuth
+@inject ApiClient Api
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<MudThemeProvider Theme="_theme" @bind-IsDarkMode="_isDark" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="2" Class="px-2">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start"
+                       OnClick="@(() => _drawerOpen = !_drawerOpen)" />
+        <MudImage Src="logo.png" Alt="LogiTrack Solutions" Width="38" Height="38" Class="mr-2 rounded" />
+        <MudText Typo="Typo.h6" Class="ml-1" Style="font-weight: 700; letter-spacing: .5px;">
+            LogiTrack Solutions
+        </MudText>
+        <MudSpacer />
+
+        <MudTooltip Text="Rastreo público">
+            <MudIconButton Icon="@Icons.Material.Filled.TravelExplore" Color="Color.Inherit"
+                           Href="/rastreo?publico=true" />
+        </MudTooltip>
+
+        <MudTooltip Text="Notificaciones">
+            <MudBadge Content="@_noLeidas" Overlap="true" Color="Color.Error" BadgeClass="mt-1"
+                      Visible="@(_noLeidas > 0)">
+                <MudIconButton Icon="@Icons.Material.Filled.Notifications" Color="Color.Inherit"
+                               Href="/notificaciones" />
+            </MudBadge>
+        </MudTooltip>
+
+        <MudToggleIconButton @bind-Toggled="_isDark" Icon="@Icons.Material.Filled.DarkMode"
+                            Color="Color.Inherit" ToggledIcon="@Icons.Material.Filled.LightMode"
+                            ToggledColor="Color.Warning" />
+
+        <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
+            <ActivatorContent>
+                <MudButton Variant="Variant.Text" Color="Color.Inherit" Class="ml-2" EndIcon="@Icons.Material.Filled.ArrowDropDown">
+                    <MudAvatar Color="Color.Secondary" Size="Size.Small" Class="mr-2" Style="font-weight:700;">
+                        @Iniciales
+                    </MudAvatar>
+                    <div class="d-flex flex-column align-start" style="line-height: 1.1;">
+                        <span style="font-size: .85rem;">@_nombre</span>
+                        <span style="font-size: .70rem; opacity: .8;">@_rol</span>
+                    </div>
+                </MudButton>
+            </ActivatorContent>
+            <ChildContent>
+                <MudMenuItem Href="/perfil" Icon="@Icons.Material.Filled.ManageAccounts">Mi perfil</MudMenuItem>
+                <MudMenuItem OnClick="CerrarSesion" Icon="@Icons.Material.Filled.Logout">Cerrar sesión</MudMenuItem>
+            </ChildContent>
+        </MudMenu>
+    </MudAppBar>
+
+    <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="1">
+        <NavMenu />
+    </MudDrawer>
+
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="my-4 pt-2">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    private bool _drawerOpen = true;
+    private bool _isDark;
+    private string _nombre = "Usuario";
+    private string _rol = string.Empty;
+    private int _noLeidas;
+    private bool _autenticado;
+    private Timer? _timer;
+
+    private string Iniciales
+    {
+        get
+        {
+            var partes = _nombre.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            return partes.Length >= 2
+                ? $"{partes[0][0]}{partes[1][0]}".ToUpperInvariant()
+                : (_nombre.Length > 0 ? _nombre[..1].ToUpperInvariant() : "LT");
+        }
+    }
+
+    private readonly MudTheme _theme = new()
+    {
+        PaletteLight = new PaletteLight
+        {
+            Primary = "#0B6E4F",
+            Secondary = "#F4A300",
+            AppbarBackground = "#0B6E4F",
+            DrawerBackground = "#F7FAF8",
+            Background = "#F4F7F5"
+        },
+        PaletteDark = new PaletteDark
+        {
+            Primary = "#37C99B",
+            Secondary = "#FFC24D",
+            AppbarBackground = "#10231C"
+        },
+        LayoutProperties = new LayoutProperties { DefaultBorderRadius = "8px" },
+        Typography = new Typography
+        {
+            Default = new DefaultTypography { FontFamily = new[] { "Segoe UI", "Roboto", "Arial", "sans-serif" } }
+        }
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        Api.SesionExpirada += OnSesionExpirada;
+        Nav.LocationChanged += OnLocationChanged;
+
+        var state = await AuthProvider.GetAuthenticationStateAsync();
+        _autenticado = state.User.Identity?.IsAuthenticated == true;
+        _nombre = state.User.Identity?.Name ?? "Usuario";
+        _rol = state.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? string.Empty;
+
+        if (_autenticado)
+        {
+            await ActualizarNotificacionesAsync();
+
+            _timer = new Timer(async _ => await InvokeAsync(async () =>
+            {
+                await ActualizarNotificacionesAsync();
+                StateHasChanged();
+            }), null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(60));
+        }
+    }
+
+    private async Task ActualizarNotificacionesAsync()
+    {
+        if (!_autenticado)
+        {
+            _noLeidas = 0;
+            return;
+        }
+
+        try
+        {
+            var data = await Api.GetAsync<NoLeidasDto>("api/notificaciones/no-leidas");
+            _noLeidas = data?.Total ?? 0;
+        }
+        catch
+        {
+            // silencioso: el badge no debe romper la navegación
+        }
+    }
+
+    private async void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        await ActualizarNotificacionesAsync();
+        StateHasChanged();
+    }
+
+    private async void OnSesionExpirada()
+    {
+        await JwtAuth.SignOutAsync();
+        Snackbar.Add("Su sesión expiró. Inicie sesión nuevamente.", Severity.Warning);
+        Nav.NavigateTo("/login");
+    }
+
+    private async Task CerrarSesion()
+    {
+        await JwtAuth.SignOutAsync();
+        Nav.NavigateTo("/login");
+    }
+
+    public void Dispose()
+    {
+        Api.SesionExpirada -= OnSesionExpirada;
+        Nav.LocationChanged -= OnLocationChanged;
+        _timer?.Dispose();
+    }
+
+    private class NoLeidasDto
+    {
+        public int Total { get; set; }
+    }
+}

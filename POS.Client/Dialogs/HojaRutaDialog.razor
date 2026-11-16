@@ -1,0 +1,124 @@
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-weight:700;">Nueva hoja de ruta</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (_cargando)
+        {
+            <div class="d-flex justify-center py-6"><MudProgressCircular Indeterminate="true" /></div>
+        }
+        else
+        {
+            @if (!string.IsNullOrWhiteSpace(_error))
+            {
+                <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mb-4">@_error</MudAlert>
+            }
+
+            @if (_recursos.Conductores.Count == 0 || _recursos.Vehiculos.Count == 0)
+            {
+                <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mb-4">
+                    No hay conductores o vehículos disponibles. Verifique que no tengan otra hoja activa y que el vehículo esté en estado “Disponible”.
+                </MudAlert>
+            }
+
+            <MudSelect T="int" @bind-Value="_idConductor" Label="Conductor/Operador" Variant="Variant.Outlined"
+                       AnchorOrigin="Origin.BottomCenter" Required="true" Class="mb-3">
+                @foreach (var c in _recursos.Conductores)
+                {
+                    <MudSelectItem T="int" Value="@c.IdUsuario">@c.NombreCompleto</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudSelect T="int" @bind-Value="_idVehiculo" Label="Vehículo" Variant="Variant.Outlined"
+                       AnchorOrigin="Origin.BottomCenter" Required="true" Class="mb-2">
+                @foreach (var v in _recursos.Vehiculos)
+                {
+                    <MudSelectItem T="int" Value="@v.IdVehiculo">
+                        @v.Placa · @v.Tipo · @v.CapacidadKg.ToString("N0") kg / @v.CapacidadM3.ToString("N1") m³
+                    </MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mt-3">
+                Regla RN04: un conductor y un vehículo solo pueden tener una hoja de ruta activa a la vez.
+            </MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar" Variant="Variant.Text">Cancelar</MudButton>
+        <MudButton OnClick="GuardarAsync" Variant="Variant.Filled" Color="Color.Primary"
+                   Disabled="_guardando || _recursos.Conductores.Count == 0 || _recursos.Vehiculos.Count == 0">
+            @if (_guardando)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" Color="Color.Inherit" />
+            }
+            Crear hoja de ruta
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Inject] private ApiClient Api { get; set; } = default!;
+    [Inject] private ISnackbar Snackbar { get; set; } = default!;
+
+    private RecursosHojaRutaDto _recursos = new();
+    private int _idConductor;
+    private int _idVehiculo;
+    private bool _cargando = true;
+    private bool _guardando;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _recursos = await Api.GetAsync<RecursosHojaRutaDto>("api/hojas-ruta/recursos") ?? new();
+            _idConductor = _recursos.Conductores.FirstOrDefault()?.IdUsuario ?? 0;
+            _idVehiculo = _recursos.Vehiculos.FirstOrDefault()?.IdVehiculo ?? 0;
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    private async Task GuardarAsync()
+    {
+        if (_idConductor <= 0 || _idVehiculo <= 0)
+        {
+            _error = "Seleccione un conductor y un vehículo.";
+            return;
+        }
+
+        _guardando = true;
+        _error = null;
+
+        try
+        {
+            await Api.PostAsync<HojaRutaDto>("api/hojas-ruta", new CrearHojaRutaRequest
+            {
+                IdConductor = _idConductor,
+                IdVehiculo = _idVehiculo
+            });
+
+            Snackbar.Add("Hoja de ruta creada y notificada al conductor.", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _guardando = false;
+        }
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+}

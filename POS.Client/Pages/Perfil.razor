@@ -1,0 +1,165 @@
+@page "/perfil"
+@attribute [Authorize]
+@inject ApiClient Api
+@inject AuthenticationStateProvider AuthProvider
+@inject ISnackbar Snackbar
+
+<PageTitle>LogiTrack Solutions · Mi perfil</PageTitle>
+
+<MudText Typo="Typo.h4" Style="font-weight:800;">Mi perfil</MudText>
+<MudText Typo="Typo.body2" Class="mud-text-secondary mb-4">
+    Datos de la cuenta y cambio de contraseña.
+</MudText>
+
+@if (_cargando)
+{
+    <div class="d-flex justify-center my-10"><MudProgressCircular Indeterminate="true" /></div>
+}
+else
+{
+    <MudGrid Spacing="3" Class="mt-2">
+        <MudItem xs="12" md="5">
+            <MudPaper Elevation="2" Class="pa-5" Style="height:100%;">
+                <div class="d-flex align-center gap-3 mb-4">
+                    <MudAvatar Color="Color.Primary" Size="Size.Large" Style="font-weight:700;">
+                        @Iniciales
+                    </MudAvatar>
+                    <div>
+                        <MudText Typo="Typo.h6" Style="font-weight:700;">@_perfil?.NombreCompleto</MudText>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">@_perfil?.Rol</MudText>
+                    </div>
+                </div>
+
+                <MudDivider Class="mb-4" />
+
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">Correo electrónico</MudText>
+                <MudText Typo="Typo.body1" Class="mb-3">@_perfil?.Correo</MudText>
+
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">Rol asignado</MudText>
+                <MudText Typo="Typo.body1" Class="mb-3">@_perfil?.Rol</MudText>
+
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">Identificador</MudText>
+                <MudText Typo="Typo.body1">Usuario #@_perfil?.IdUsuario</MudText>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="7">
+            <MudPaper Elevation="2" Class="pa-5">
+                <MudText Typo="Typo.h6" Style="font-weight:700;" Class="mb-2">Cambiar contraseña</MudText>
+                <MudText Typo="Typo.caption" Class="mud-text-secondary mb-4">
+                    La nueva contraseña debe tener al menos 8 caracteres.
+                </MudText>
+
+                @if (!string.IsNullOrWhiteSpace(_error))
+                {
+                    <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mb-4">@_error</MudAlert>
+                }
+
+                <MudTextField @bind-Value="_actual" Label="Contraseña actual" Variant="Variant.Outlined"
+                              InputType="@(_ver ? InputType.Text : InputType.Password)"
+                              Adornment="Adornment.End"
+                              AdornmentIcon="@(_ver ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                              OnAdornmentClick="@(() => _ver = !_ver)" Class="mb-3" />
+                <MudTextField @bind-Value="_nueva" Label="Nueva contraseña" Variant="Variant.Outlined"
+                              InputType="@(_ver ? InputType.Text : InputType.Password)" Class="mb-3" />
+                <MudTextField @bind-Value="_confirmacion" Label="Confirmar nueva contraseña"
+                              Variant="Variant.Outlined" InputType="@(_ver ? InputType.Text : InputType.Password)"
+                              Class="mb-4" />
+
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.LockReset"
+                           OnClick="CambiarPasswordAsync" Disabled="_guardando">
+                    @if (_guardando)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" Color="Color.Inherit" />
+                    }
+                    Actualizar contraseña
+                </MudButton>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private UsuarioSesionDto? _perfil;
+    private string _actual = string.Empty;
+    private string _nueva = string.Empty;
+    private string _confirmacion = string.Empty;
+    private bool _ver;
+    private bool _cargando = true;
+    private bool _guardando;
+    private string? _error;
+
+    private string Iniciales
+    {
+        get
+        {
+            var nombre = _perfil?.NombreCompleto ?? "LT";
+            var partes = nombre.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            return partes.Length >= 2
+                ? $"{partes[0][0]}{partes[1][0]}".ToUpperInvariant()
+                : nombre[..Math.Min(2, nombre.Length)].ToUpperInvariant();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _perfil = await Api.GetAsync<UsuarioSesionDto>("api/auth/me");
+        }
+        catch (ApiException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    private async Task CambiarPasswordAsync()
+    {
+        _error = null;
+
+        if (string.IsNullOrWhiteSpace(_actual) || string.IsNullOrWhiteSpace(_nueva))
+        {
+            _error = "Ingrese su contraseña actual y la nueva contraseña.";
+            return;
+        }
+
+        if (_nueva.Length < 8)
+        {
+            _error = "La nueva contraseña debe tener al menos 8 caracteres.";
+            return;
+        }
+
+        if (_nueva != _confirmacion)
+        {
+            _error = "Las contraseñas no coinciden.";
+            return;
+        }
+
+        _guardando = true;
+
+        try
+        {
+            await Api.PostAsync("api/auth/cambiar-password", new CambiarPasswordRequest
+            {
+                PasswordActual = _actual,
+                PasswordNueva = _nueva,
+                Confirmacion = _confirmacion
+            });
+
+            Snackbar.Add("Contraseña actualizada correctamente.", Severity.Success);
+            _actual = _nueva = _confirmacion = string.Empty;
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _guardando = false;
+        }
+    }
+}

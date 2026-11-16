@@ -1,0 +1,164 @@
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-weight:700;">Confirmar entrega</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mb-4">@_error</MudAlert>
+        }
+
+        <MudText Typo="Typo.body2" Class="mb-1">
+            Guía <b>@Guia?.CodigoGuia</b> · @Guia?.Destinatario
+        </MudText>
+        <MudText Typo="Typo.caption" Class="mud-text-secondary mb-4">
+            La confirmación marca la guía como <b>Entregado</b> y notifica al cliente interno.
+        </MudText>
+
+        <MudTextField @bind-Value="_nombreReceptor" Label="Nombre del receptor" Variant="Variant.Outlined"
+                      MaxLength="120" Class="mb-4" />
+
+        <MudText Typo="Typo.subtitle2" Class="mb-1">Comprobante de entrega (RN07)</MudText>
+        <MudText Typo="Typo.caption" Class="mud-text-secondary mb-2">
+            Adjunte la firma del receptor o una fotografía. Al menos uno es obligatorio.
+        </MudText>
+
+        <MudGrid>
+            <MudItem xs="12" sm="6">
+                <MudPaper Outlined="true" Class="pa-3">
+                    <MudText Typo="Typo.body2" Class="mb-2">Firma del receptor</MudText>
+                    <InputFile OnChange="SubirFirmaAsync" accept=".png,.jpg,.jpeg,.webp" disabled="@_subiendo" />
+                    @if (_subiendo == false && !string.IsNullOrWhiteSpace(_rutaFirma))
+                    {
+                        <MudImage Src="@_rutaFirma" Width="160" Height="90" Class="rounded mt-2" ObjectFit="ObjectFit.Contain" />
+                    }
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudPaper Outlined="true" Class="pa-3">
+                    <MudText Typo="Typo.body2" Class="mb-2">Fotografía de entrega</MudText>
+                    <InputFile OnChange="SubirFotoAsync" accept=".png,.jpg,.jpeg,.webp" disabled="@_subiendo" />
+                    @if (_subiendo == false && !string.IsNullOrWhiteSpace(_rutaFoto))
+                    {
+                        <MudImage Src="@_rutaFoto" Width="160" Height="90" Class="rounded mt-2" ObjectFit="ObjectFit.Cover" />
+                    }
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+
+        @if (_subiendo)
+        {
+            <div class="d-flex align-center gap-2 mt-3">
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                <MudText Typo="Typo.caption">Subiendo comprobante…</MudText>
+            </div>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar" Variant="Variant.Text">Cancelar</MudButton>
+        <MudButton OnClick="GuardarAsync" Variant="Variant.Filled" Color="Color.Success"
+                   StartIcon="@Icons.Material.Filled.CheckCircle"
+                   Disabled="_guardando || _subiendo || (string.IsNullOrWhiteSpace(_rutaFirma) && string.IsNullOrWhiteSpace(_rutaFoto))">
+            @if (_guardando)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" Color="Color.Inherit" />
+            }
+            Confirmar entrega
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public GuiaDto? Guia { get; set; }
+
+    [Inject] private ApiClient Api { get; set; } = default!;
+    [Inject] private ISnackbar Snackbar { get; set; } = default!;
+
+    private string? _nombreReceptor;
+    private string? _rutaFirma;
+    private string? _rutaFoto;
+    private bool _guardando;
+    private bool _subiendo;
+    private string? _error;
+
+    private Task SubirFirmaAsync(InputFileChangeEventArgs e) => SubirAsync(e, "firmas", ruta => _rutaFirma = ruta);
+    private Task SubirFotoAsync(InputFileChangeEventArgs e) => SubirAsync(e, "fotos", ruta => _rutaFoto = ruta);
+
+    private async Task SubirAsync(InputFileChangeEventArgs e, string carpeta, Action<string> asignar)
+    {
+        var archivo = e.File;
+        if (archivo == null)
+        {
+            return;
+        }
+
+        if (archivo.Size > 5 * 1024 * 1024)
+        {
+            _error = "El archivo supera el límite de 5 MB.";
+            return;
+        }
+
+        _subiendo = true;
+        _error = null;
+
+        try
+        {
+            await using var stream = archivo.OpenReadStream(5 * 1024 * 1024);
+            var subido = await Api.SubirArchivoAsync(stream, archivo.Name, carpeta);
+            if (subido != null)
+            {
+                asignar(subido.Ruta);
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = "No se pudo subir el comprobante: " + ex.Message;
+        }
+        finally
+        {
+            _subiendo = false;
+        }
+    }
+
+    private async Task GuardarAsync()
+    {
+        if (Guia == null)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_rutaFirma) && string.IsNullOrWhiteSpace(_rutaFoto))
+        {
+            _error = "Adjunte la firma o una fotografía como comprobante (RN07).";
+            return;
+        }
+
+        _guardando = true;
+        _error = null;
+
+        try
+        {
+            await Api.PostAsync<EntregaDto>("api/entregas", new CrearEntregaRequest
+            {
+                IdGuia = Guia.IdGuia,
+                NombreReceptor = _nombreReceptor?.Trim(),
+                RutaFirma = _rutaFirma,
+                RutaFoto = _rutaFoto
+            });
+
+            Snackbar.Add("Entrega confirmada correctamente.", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _guardando = false;
+        }
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+}

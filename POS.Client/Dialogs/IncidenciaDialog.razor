@@ -1,0 +1,189 @@
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-weight:700;">Reportar incidencia</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (_cargando)
+        {
+            <div class="d-flex justify-center py-6"><MudProgressCircular Indeterminate="true" /></div>
+        }
+        else
+        {
+            @if (!string.IsNullOrWhiteSpace(_error))
+            {
+                <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mb-4">@_error</MudAlert>
+            }
+
+            <MudText Typo="Typo.body2" Class="mb-4">
+                Guía <b>@Guia?.CodigoGuia</b> · @Guia?.Destinatario
+            </MudText>
+
+            <MudSelect T="int" @bind-Value="_idTipo" Label="Tipo de incidencia" Variant="Variant.Outlined"
+                       AnchorOrigin="Origin.BottomCenter" Required="true" Class="mb-3">
+                @foreach (var tipo in _tipos)
+                {
+                    <MudSelectItem T="int" Value="@tipo.IdTipoIncidencia">@tipo.Nombre</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudTextField @bind-Value="_descripcion" Label="Descripción de la incidencia"
+                          Variant="Variant.Outlined" Lines="3" MaxLength="500" Required="true"
+                          Counter="500" Class="mb-3" />
+
+            <MudText Typo="Typo.subtitle2" Class="mb-1">
+                Fotografía de evidencia <span style="color: var(--mud-palette-error);">*</span>
+            </MudText>
+            <MudText Typo="Typo.caption" Class="mud-text-secondary mb-2">
+                Obligatoria según RN08. Formatos PNG/JPG/WEBP, máximo 5 MB.
+            </MudText>
+
+            <MudPaper Outlined="true" Class="pa-3 d-flex align-center gap-3 flex-wrap">
+                <InputFile OnChange="SubirFotoAsync" accept=".png,.jpg,.jpeg,.webp" disabled="@_subiendo" />
+                @if (_subiendo)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                }
+                @if (!string.IsNullOrWhiteSpace(_rutaFoto))
+                {
+                    <MudImage Src="@_rutaFoto" Width="72" Height="72" Class="rounded" ObjectFit="ObjectFit.Cover" />
+                    <MudChip T="string" Color="Color.Success" Size="Size.Small" Icon="@Icons.Material.Filled.Check">
+                        Evidencia cargada
+                    </MudChip>
+                }
+            </MudPaper>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar" Variant="Variant.Text">Cancelar</MudButton>
+        <MudButton OnClick="GuardarAsync" Variant="Variant.Filled" Color="Color.Warning"
+                   Disabled="_guardando || _subiendo || string.IsNullOrWhiteSpace(_rutaFoto)">
+            @if (_guardando)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" Color="Color.Inherit" />
+            }
+            Registrar incidencia
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public GuiaDto? Guia { get; set; }
+
+    [Inject] private ApiClient Api { get; set; } = default!;
+    [Inject] private CatalogosService Catalogos { get; set; } = default!;
+    [Inject] private ISnackbar Snackbar { get; set; } = default!;
+
+    private List<TipoIncidenciaDto> _tipos = new();
+    private int _idTipo;
+    private string _descripcion = string.Empty;
+    private string? _rutaFoto;
+    private bool _cargando = true;
+    private bool _guardando;
+    private bool _subiendo;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var cat = await Catalogos.GetAsync();
+            _tipos = cat.TiposIncidencia;
+            _idTipo = _tipos.FirstOrDefault()?.IdTipoIncidencia ?? 0;
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    private async Task SubirFotoAsync(InputFileChangeEventArgs e)
+    {
+        var archivo = e.File;
+        if (archivo == null)
+        {
+            return;
+        }
+
+        if (archivo.Size > 5 * 1024 * 1024)
+        {
+            _error = "La fotografía supera el límite de 5 MB.";
+            return;
+        }
+
+        _subiendo = true;
+        _error = null;
+
+        try
+        {
+            await using var stream = archivo.OpenReadStream(5 * 1024 * 1024);
+            var subido = await Api.SubirArchivoAsync(stream, archivo.Name, "evidencias");
+            _rutaFoto = subido?.Ruta;
+        }
+        catch (Exception ex)
+        {
+            _error = "No se pudo subir la fotografía: " + ex.Message;
+        }
+        finally
+        {
+            _subiendo = false;
+        }
+    }
+
+    private async Task GuardarAsync()
+    {
+        if (Guia == null)
+        {
+            return;
+        }
+
+        if (_idTipo <= 0)
+        {
+            _error = "Seleccione el tipo de incidencia.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_descripcion))
+        {
+            _error = "Describa la incidencia.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_rutaFoto))
+        {
+            _error = "La fotografía de evidencia es obligatoria (RN08).";
+            return;
+        }
+
+        _guardando = true;
+        _error = null;
+
+        try
+        {
+            await Api.PostAsync<IncidenciaDto>("api/incidencias", new CrearIncidenciaRequest
+            {
+                IdGuia = Guia.IdGuia,
+                IdTipoIncidencia = _idTipo,
+                Descripcion = _descripcion.Trim(),
+                RutaFoto = _rutaFoto
+            });
+
+            Snackbar.Add("Incidencia registrada y notificada.", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _guardando = false;
+        }
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+}

@@ -1,0 +1,143 @@
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-weight:700;">@(Edicion ? "Editar vehículo" : "Nuevo vehículo")</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mb-4">@_error</MudAlert>
+        }
+
+        <MudTextField @bind-Value="_placa" Label="Placa" Variant="Variant.Outlined" MaxLength="15"
+                      Required="true" Class="mb-3" />
+        <MudTextField @bind-Value="_tipo" Label="Tipo de vehículo" Variant="Variant.Outlined" MaxLength="40"
+                      Required="true" Class="mb-3"
+                      HelperText="Ej.: Camión, Furgoneta, Motocicleta." />
+        <MudGrid>
+            <MudItem xs="12" sm="6">
+                <MudNumericField T="decimal" @bind-Value="_capacidadKg" Label="Capacidad (kg)"
+                                 Variant="Variant.Outlined" Min="0.01m" Format="N2" Required="true" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudNumericField T="decimal" @bind-Value="_capacidadM3" Label="Capacidad (m³)"
+                                 Variant="Variant.Outlined" Min="0.01m" Format="N2" Required="true" />
+            </MudItem>
+        </MudGrid>
+
+        <MudSelect T="string" @bind-Value="_estado" Label="Estado" Variant="Variant.Outlined"
+                   AnchorOrigin="Origin.BottomCenter" Required="true" Class="mt-3"
+                   Disabled="@(_enRuta)"
+                   HelperText="@(_enRuta ? "El vehículo está asignado a una hoja de ruta activa; el estado lo controla el sistema." : null)">
+            @if (_enRuta)
+            {
+                <MudSelectItem T="string" Value="@Estados.VehiculoEnRuta">En ruta</MudSelectItem>
+            }
+            <MudSelectItem T="string" Value="@Estados.VehiculoDisponible">Disponible</MudSelectItem>
+            <MudSelectItem T="string" Value="@Estados.VehiculoMantenimiento">Mantenimiento</MudSelectItem>
+            <MudSelectItem T="string" Value="@Estados.VehiculoInhabilitado">Inhabilitado</MudSelectItem>
+        </MudSelect>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar" Variant="Variant.Text">Cancelar</MudButton>
+        <MudButton OnClick="GuardarAsync" Variant="Variant.Filled" Color="Color.Primary" Disabled="_guardando">
+            @if (_guardando)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" Color="Color.Inherit" />
+            }
+            @(Edicion ? "Guardar cambios" : "Crear vehículo")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public VehiculoDto? Vehiculo { get; set; }
+    [Parameter] public bool Edicion { get; set; }
+
+    [Inject] private ApiClient Api { get; set; } = default!;
+    [Inject] private CatalogosService Catalogos { get; set; } = default!;
+    [Inject] private ISnackbar Snackbar { get; set; } = default!;
+
+    private string _placa = string.Empty;
+    private string _tipo = string.Empty;
+    private decimal _capacidadKg;
+    private decimal _capacidadM3;
+    private string _estado = Estados.VehiculoDisponible;
+    private bool _guardando;
+    private bool _enRuta;
+    private string? _error;
+
+    protected override void OnInitialized()
+    {
+        _enRuta = Edicion && Vehiculo?.Estado == Estados.VehiculoEnRuta;
+
+        if (Edicion && Vehiculo != null)
+        {
+            _placa = Vehiculo.Placa;
+            _tipo = Vehiculo.Tipo;
+            _capacidadKg = Vehiculo.CapacidadKg;
+            _capacidadM3 = Vehiculo.CapacidadM3;
+            _estado = Vehiculo.Estado;
+        }
+        else
+        {
+            _enRuta = false;
+        }
+    }
+
+    private async Task GuardarAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_placa) || string.IsNullOrWhiteSpace(_tipo) ||
+            _capacidadKg <= 0 || _capacidadM3 <= 0)
+        {
+            _error = "Complete la placa, el tipo y las capacidades del vehículo.";
+            return;
+        }
+
+        _guardando = true;
+        _error = null;
+
+        try
+        {
+            if (Edicion && Vehiculo != null)
+            {
+                await Api.PutAsync<VehiculoDto>($"api/vehiculos/{Vehiculo.IdVehiculo}", new ActualizarVehiculoRequest
+                {
+                    Placa = _placa.Trim().ToUpperInvariant(),
+                    Tipo = _tipo.Trim(),
+                    CapacidadKg = _capacidadKg,
+                    CapacidadM3 = _capacidadM3,
+                    Estado = _estado
+                });
+
+                Snackbar.Add("Vehículo actualizado correctamente.", Severity.Success);
+            }
+            else
+            {
+                await Api.PostAsync<VehiculoDto>("api/vehiculos", new CrearVehiculoRequest
+                {
+                    Placa = _placa.Trim().ToUpperInvariant(),
+                    Tipo = _tipo.Trim(),
+                    CapacidadKg = _capacidadKg,
+                    CapacidadM3 = _capacidadM3,
+                    Estado = _estado
+                });
+
+                Snackbar.Add("Vehículo registrado correctamente.", Severity.Success);
+            }
+
+            Catalogos.Invalidar();
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _guardando = false;
+        }
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+}

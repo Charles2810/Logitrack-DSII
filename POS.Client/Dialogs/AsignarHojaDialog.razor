@@ -1,0 +1,115 @@
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-weight:700;">Asignar hoja de ruta</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (string.IsNullOrWhiteSpace(Guia?.CodigoGuia))
+        {
+            <MudProgressCircular Indeterminate="true" />
+        }
+        else
+        {
+            <MudText Typo="Typo.body2" Class="mb-4">
+                Guía <b>@Guia.CodigoGuia</b> · @Guia.Destinatario
+            </MudText>
+
+            @if (!string.IsNullOrWhiteSpace(_error))
+            {
+                <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mb-3">@_error</MudAlert>
+            }
+
+            <MudSelect T="int" @bind-Value="_idHoja" Label="Hoja de ruta" Variant="Variant.Outlined"
+                       Clearable="true" AnchorOrigin="Origin.BottomCenter"
+                       HelperText="Deje vacío para quitar la asignación.">
+                @foreach (var h in _hojas)
+                {
+                    <MudSelectItem T="int" Value="@h.IdHojaRuta">
+                        #@h.IdHojaRuta · @h.VehiculoPlaca · @h.Conductor (@h.Estado)
+                    </MudSelectItem>
+                }
+            </MudSelect>
+
+            @if (_hojas.Count == 0)
+            {
+                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mt-3" Dense="true">
+                    No hay hojas de ruta con capacidad disponible. Cree una nueva hoja primero.
+                </MudAlert>
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar" Variant="Variant.Text">Cancelar</MudButton>
+        <MudButton OnClick="GuardarAsync" Variant="Variant.Filled" Color="Color.Primary" Disabled="_guardando">
+            @if (_guardando)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" Color="Color.Inherit" />
+            }
+            Guardar asignación
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public GuiaDto? Guia { get; set; }
+
+    [Inject] private ApiClient Api { get; set; } = default!;
+    [Inject] private ISnackbar Snackbar { get; set; } = default!;
+
+    private List<HojaRutaDto> _hojas = new();
+    private int _idHoja;
+    private bool _guardando;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var pendientes = await Api.GetAsync<PagedResult<HojaRutaDto>>("api/hojas-ruta?pageSize=100");
+            _hojas = (pendientes?.Items ?? new List<HojaRutaDto>())
+                .Where(h => h.Estado != Estados.HojaFinalizada)
+                .ToList();
+
+            if (Guia?.IdHojaRuta != null)
+            {
+                _idHoja = Guia.IdHojaRuta.Value;
+            }
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task GuardarAsync()
+    {
+        if (Guia == null)
+        {
+            return;
+        }
+
+        _guardando = true;
+        _error = null;
+
+        try
+        {
+            await Api.PatchAsync<GuiaDto>($"api/guias/{Guia.IdGuia}/hoja-ruta", new AsignarGuiaRequest
+            {
+                IdHojaRuta = _idHoja <= 0 ? null : _idHoja
+            });
+
+            Snackbar.Add("Hoja de ruta asignada correctamente.", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _guardando = false;
+        }
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+}

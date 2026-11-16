@@ -1,0 +1,163 @@
+@page "/notificaciones"
+@attribute [Authorize]
+@inject ApiClient Api
+@inject ISnackbar Snackbar
+
+<PageTitle>LogiTrack Solutions · Notificaciones</PageTitle>
+
+<div class="d-flex justify-space-between align-center flex-wrap gap-3 mb-4">
+    <div>
+        <MudText Typo="Typo.h4" Style="font-weight:800;">Notificaciones</MudText>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">
+            Alertas generadas automáticamente por los eventos del sistema.
+        </MudText>
+    </div>
+    <div class="d-flex gap-2">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh"
+                   OnClick="CargarAsync" Disabled="_cargando">Actualizar</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.DoneAll"
+                   OnClick="MarcarTodasAsync" Disabled="@(_noLeidas == 0 || _procesando)">Marcar todas como leídas</MudButton>
+    </div>
+</div>
+
+<MudPaper Elevation="2" Class="pa-4 mb-4">
+    <div class="d-flex gap-3 align-center flex-wrap">
+        <MudButtonGroup Color="Color.Primary" Variant="Variant.Outlined">
+            <MudButton OnClick="@(() => FiltrarAsync(null))"
+                       Variant="@(_filtro == null ? Variant.Filled : Variant.Outlined)">Todas</MudButton>
+            <MudButton OnClick="@(() => FiltrarAsync(false))"
+                       Variant="@(_filtro == false ? Variant.Filled : Variant.Outlined)">No leídas</MudButton>
+            <MudButton OnClick="@(() => FiltrarAsync(true))"
+                       Variant="@(_filtro == true ? Variant.Filled : Variant.Outlined)">Leídas</MudButton>
+        </MudButtonGroup>
+        <MudChip T="string" Color="Color.Error" Variant="Variant.Filled" Size="Size.Small">
+            @_noLeidas sin leer
+        </MudChip>
+    </div>
+</MudPaper>
+
+@if (_cargando)
+{
+    <div class="d-flex justify-center my-10"><MudProgressCircular Indeterminate="true" /></div>
+}
+else if (_items.Count == 0)
+{
+    <MudPaper Elevation="2" Class="pa-8 text-center">
+        <MudIcon Icon="@Icons.Material.Outlined.NotificationsNone" Size="Size.Large" Color="Color.Default" />
+        <MudText Typo="Typo.body1" Class="mt-2 mud-text-secondary">No hay notificaciones para mostrar.</MudText>
+    </MudPaper>
+}
+else
+{
+    <MudPaper Elevation="2" Class="pa-2">
+        @foreach (var n in _items)
+        {
+            <div class="d-flex align-start gap-3 pa-3"
+                 style="border-bottom:1px solid var(--mud-palette-lines-default);">
+                <MudIcon Icon="@(n.Leida ? Icons.Material.Outlined.NotificationsNone : Icons.Material.Filled.NotificationsActive)"
+                         Color="@(n.Leida ? Color.Default : Color.Primary)" Class="mt-1" />
+                <div style="flex:1;">
+                    <div class="d-flex justify-space-between align-start flex-wrap gap-2">
+                        <div>
+                            <MudText Typo="Typo.subtitle2" Style="font-weight:600;">@n.Tipo</MudText>
+                            <MudText Typo="Typo.body2">@n.Mensaje</MudText>
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                @n.FechaHora.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                            </MudText>
+                        </div>
+                        <div class="d-flex gap-1">
+                            @if (n.IdGuia.HasValue)
+                            {
+                                <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary"
+                                           Href="@($"/guias/{n.IdGuia}")">Ver guía</MudButton>
+                            }
+                            @if (!n.Leida)
+                            {
+                                <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Success"
+                                           StartIcon="@Icons.Material.Filled.Done" Disabled="_procesando"
+                                           OnClick="@(() => MarcarLeidaAsync(n))">Marcar leída</MudButton>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </MudPaper>
+}
+
+@code {
+    private List<NotificacionDto> _items = new();
+    private bool? _filtro;
+    private int _noLeidas;
+    private bool _cargando = true;
+    private bool _procesando;
+
+    protected override Task OnInitializedAsync() => CargarAsync();
+
+    private async Task CargarAsync()
+    {
+        _cargando = true;
+        try
+        {
+            var url = "api/notificaciones?limite=200";
+            if (_filtro.HasValue)
+            {
+                url += $"&leida={_filtro.Value.ToString().ToLowerInvariant()}";
+            }
+
+            _items = await Api.GetAsync<List<NotificacionDto>>(url) ?? new();
+            _noLeidas = _items.Count(n => !n.Leida);
+        }
+        catch (ApiException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    private async Task FiltrarAsync(bool? filtro)
+    {
+        _filtro = filtro;
+        await CargarAsync();
+    }
+
+    private async Task MarcarLeidaAsync(NotificacionDto notificacion)
+    {
+        _procesando = true;
+        try
+        {
+            await Api.PatchAsync($"api/notificaciones/{notificacion.IdNotificacion}/leida");
+            await CargarAsync();
+        }
+        catch (ApiException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _procesando = false;
+        }
+    }
+
+    private async Task MarcarTodasAsync()
+    {
+        _procesando = true;
+        try
+        {
+            await Api.PatchAsync("api/notificaciones/leer-todas");
+            Snackbar.Add("Todas las notificaciones fueron marcadas como leídas.", Severity.Success);
+            await CargarAsync();
+        }
+        catch (ApiException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _procesando = false;
+        }
+    }
+}

@@ -1,0 +1,157 @@
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-weight:700;">Registrar movimiento de inventario</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (_cargando)
+        {
+            <div class="d-flex justify-center py-6"><MudProgressCircular Indeterminate="true" /></div>
+        }
+        else
+        {
+            @if (!string.IsNullOrWhiteSpace(_error))
+            {
+                <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mb-4">@_error</MudAlert>
+            }
+
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="int" @bind-Value="_idAlmacen" Label="Almacén" Variant="Variant.Outlined"
+                               AnchorOrigin="Origin.BottomCenter" Required="true">
+                        @foreach (var a in _almacenes)
+                        {
+                            <MudSelectItem T="int" Value="@a.IdAlmacen">@a.Nombre · @a.Ciudad</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="string" @bind-Value="_tipo" Label="Tipo de movimiento" Variant="Variant.Outlined"
+                               AnchorOrigin="Origin.BottomCenter" Required="true">
+                        <MudSelectItem T="string" Value="@Estados.TipoEntrada">ENTRADA</MudSelectItem>
+                        <MudSelectItem T="string" Value="@Estados.TipoSalida">SALIDA</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12">
+                    <MudSelect T="int" @bind-Value="_idProducto" Label="Producto" Variant="Variant.Outlined"
+                               AnchorOrigin="Origin.BottomCenter" Required="true">
+                        @foreach (var p in _productos)
+                        {
+                            <MudSelectItem T="int" Value="@p.IdProducto">@p.Sku · @p.Nombre</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField T="int" @bind-Value="_cantidad" Label="Cantidad" Variant="Variant.Outlined"
+                                     Min="1" Required="true" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="int?" @bind-Value="_idGuia" Label="Guía relacionada (opcional)"
+                               Variant="Variant.Outlined" Clearable="true" AnchorOrigin="Origin.BottomCenter">
+                        @foreach (var g in _guias)
+                        {
+                            <MudSelectItem T="int?" Value="@g.IdGuia">@g.CodigoGuia · @g.Destinatario</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+            </MudGrid>
+
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mt-3">
+                El stock se actualiza automáticamente mediante los triggers de la base de datos.
+                RN09: una salida no puede dejar el stock en negativo.
+            </MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar" Variant="Variant.Text">Cancelar</MudButton>
+        <MudButton OnClick="GuardarAsync" Variant="Variant.Filled" Color="Color.Primary" Disabled="_guardando">
+            @if (_guardando)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" Color="Color.Inherit" />
+            }
+            Registrar movimiento
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public int? IdAlmacenInicial { get; set; }
+    [Parameter] public int? IdProductoInicial { get; set; }
+
+    [Inject] private ApiClient Api { get; set; } = default!;
+    [Inject] private CatalogosService Catalogos { get; set; } = default!;
+    [Inject] private ISnackbar Snackbar { get; set; } = default!;
+
+    private List<AlmacenDto> _almacenes = new();
+    private List<ProductoDto> _productos = new();
+    private List<GuiaDto> _guias = new();
+    private int _idAlmacen;
+    private int _idProducto;
+    private int? _idGuia;
+    private string _tipo = Estados.TipoEntrada;
+    private int _cantidad = 1;
+    private bool _cargando = true;
+    private bool _guardando;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var cat = await Catalogos.GetAsync();
+            _almacenes = cat.Almacenes;
+            _productos = cat.Productos;
+
+            var guias = await Api.GetAsync<PagedResult<GuiaDto>>("api/guias?pageSize=100");
+            _guias = guias?.Items ?? new List<GuiaDto>();
+
+            _idAlmacen = IdAlmacenInicial ?? _almacenes.FirstOrDefault()?.IdAlmacen ?? 0;
+            _idProducto = IdProductoInicial ?? _productos.FirstOrDefault()?.IdProducto ?? 0;
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    private async Task GuardarAsync()
+    {
+        if (_idAlmacen <= 0 || _idProducto <= 0 || _cantidad <= 0)
+        {
+            _error = "Seleccione almacén, producto y una cantidad mayor a cero.";
+            return;
+        }
+
+        _guardando = true;
+        _error = null;
+
+        try
+        {
+            await Api.PostAsync<MovimientoInventarioDto>("api/inventario/movimientos", new CrearMovimientoRequest
+            {
+                IdAlmacen = _idAlmacen,
+                IdProducto = _idProducto,
+                IdGuia = _idGuia,
+                TipoMovimiento = _tipo,
+                Cantidad = _cantidad
+            });
+
+            Snackbar.Add("Movimiento registrado correctamente.", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _guardando = false;
+        }
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+}

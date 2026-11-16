@@ -1,0 +1,225 @@
+@page "/flota"
+@attribute [Authorize(Roles = "Administrador del Sistema,Administrador Logístico")]
+@inject ApiClient Api
+@inject CatalogosService Catalogos
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>LogiTrack Solutions · Flota y productos</PageTitle>
+
+<div class="d-flex justify-space-between align-center flex-wrap gap-3 mb-4">
+    <div>
+        <MudText Typo="Typo.h4" Style="font-weight:800;">Flota y productos</MudText>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">
+            Administración de vehículos, capacidades y catálogo de productos.
+        </MudText>
+    </div>
+</div>
+
+<MudPaper Elevation="2" Class="pa-4">
+    <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true">
+        <MudTabPanel Text="Vehículos" Icon="@Icons.Material.Filled.DirectionsCar">
+            <div class="d-flex justify-space-between align-center flex-wrap gap-2 mb-4">
+                <MudTextField @bind-Value="_buscarVehiculo" Label="Buscar placa o tipo" Variant="Variant.Outlined"
+                              Immediate="true" Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search" DebounceInterval="400"
+                              OnDebounceIntervalElapsed="@(_ => CargarVehiculosAsync())" Style="min-width:280px;" />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="NuevoVehiculoAsync">Nuevo vehículo</MudButton>
+            </div>
+
+            <MudTable Items="_vehiculos" Loading="_cargandoVehiculos" Dense="true" Hover="true" Striped="true"
+                      Breakpoint="Breakpoint.Sm">
+                <HeaderContent>
+                    <MudTh>Placa</MudTh>
+                    <MudTh>Tipo</MudTh>
+                    <MudTh align="Right">Capacidad kg</MudTh>
+                    <MudTh align="Right">Capacidad m³</MudTh>
+                    <MudTh>Estado</MudTh>
+                    <MudTh align="Right">Acciones</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd><b>@context.Placa</b></MudTd>
+                    <MudTd>@context.Tipo</MudTd>
+                    <MudTd align="Right">@context.CapacidadKg.ToString("N2")</MudTd>
+                    <MudTd align="Right">@context.CapacidadM3.ToString("N2")</MudTd>
+                    <MudTd>
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Filled"
+                                 Color="@ColorEstadoVehiculo(context.Estado)">
+                            @context.Estado
+                        </MudChip>
+                    </MudTd>
+                    <MudTd align="Right">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
+                                       title="Editar vehículo" OnClick="@(() => EditarVehiculoAsync(context))" />
+                    </MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary py-4">No hay vehículos registrados.</MudText>
+                </NoRecordsContent>
+            </MudTable>
+        </MudTabPanel>
+
+        <MudTabPanel Text="Productos" Icon="@Icons.Material.Filled.Inventory2">
+            <div class="d-flex justify-space-between align-center flex-wrap gap-2 mb-4">
+                <MudTextField @bind-Value="_buscarProducto" Label="Buscar SKU o nombre" Variant="Variant.Outlined"
+                              Immediate="true" Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search" DebounceInterval="400"
+                              OnDebounceIntervalElapsed="@(_ => CargarProductosAsync())" Style="min-width:280px;" />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="NuevoProductoAsync">Nuevo producto</MudButton>
+            </div>
+
+            <MudTable Items="_productos" Loading="_cargandoProductos" Dense="true" Hover="true" Striped="true"
+                      Breakpoint="Breakpoint.Sm">
+                <HeaderContent>
+                    <MudTh>SKU</MudTh>
+                    <MudTh>Producto</MudTh>
+                    <MudTh align="Right">Peso unitario (kg)</MudTh>
+                    <MudTh align="Right">Volumen unitario (m³)</MudTh>
+                    <MudTh align="Right">Acciones</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd><b>@context.Sku</b></MudTd>
+                    <MudTd>@context.Nombre</MudTd>
+                    <MudTd align="Right">@context.PesoUnitarioKg.ToString("N3")</MudTd>
+                    <MudTd align="Right">@context.VolumenUnitarioM3.ToString("N4")</MudTd>
+                    <MudTd align="Right">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
+                                       title="Editar producto" OnClick="@(() => EditarProductoAsync(context))" />
+                    </MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary py-4">No hay productos registrados.</MudText>
+                </NoRecordsContent>
+            </MudTable>
+        </MudTabPanel>
+    </MudTabs>
+</MudPaper>
+
+@code {
+    private List<VehiculoDto> _vehiculos = new();
+    private List<ProductoDto> _productos = new();
+    private string? _buscarVehiculo;
+    private string? _buscarProducto;
+    private bool _cargandoVehiculos = true;
+    private bool _cargandoProductos = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.WhenAll(CargarVehiculosAsync(), CargarProductosAsync());
+    }
+
+    private async Task CargarVehiculosAsync()
+    {
+        _cargandoVehiculos = true;
+        try
+        {
+            var url = "api/vehiculos";
+            if (!string.IsNullOrWhiteSpace(_buscarVehiculo))
+            {
+                url += $"?buscar={Uri.EscapeDataString(_buscarVehiculo.Trim())}";
+            }
+
+            _vehiculos = await Api.GetAsync<List<VehiculoDto>>(url) ?? new();
+        }
+        catch (ApiException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _cargandoVehiculos = false;
+        }
+    }
+
+    private async Task CargarProductosAsync()
+    {
+        _cargandoProductos = true;
+        try
+        {
+            var url = "api/productos";
+            if (!string.IsNullOrWhiteSpace(_buscarProducto))
+            {
+                url += $"?buscar={Uri.EscapeDataString(_buscarProducto.Trim())}";
+            }
+
+            _productos = await Api.GetAsync<List<ProductoDto>>(url) ?? new();
+        }
+        catch (ApiException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _cargandoProductos = false;
+        }
+    }
+
+    private async Task NuevoVehiculoAsync()
+    {
+        var parameters = new DialogParameters { { nameof(VehiculoDialog.Edicion), false } };
+        var dialog = await DialogService.ShowAsync<VehiculoDialog>("Nuevo vehículo", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true });
+
+        if ((await dialog.Result) is { Canceled: false })
+        {
+            await CargarVehiculosAsync();
+        }
+    }
+
+    private async Task EditarVehiculoAsync(VehiculoDto vehiculo)
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(VehiculoDialog.Vehiculo), vehiculo },
+            { nameof(VehiculoDialog.Edicion), true }
+        };
+
+        var dialog = await DialogService.ShowAsync<VehiculoDialog>("Editar vehículo", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true });
+
+        if ((await dialog.Result) is { Canceled: false })
+        {
+            await CargarVehiculosAsync();
+        }
+    }
+
+    private async Task NuevoProductoAsync()
+    {
+        var parameters = new DialogParameters { { nameof(ProductoDialog.Edicion), false } };
+        var dialog = await DialogService.ShowAsync<ProductoDialog>("Nuevo producto", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true });
+
+        if ((await dialog.Result) is { Canceled: false })
+        {
+            await CargarProductosAsync();
+        }
+    }
+
+    private async Task EditarProductoAsync(ProductoDto producto)
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(ProductoDialog.Producto), producto },
+            { nameof(ProductoDialog.Edicion), true }
+        };
+
+        var dialog = await DialogService.ShowAsync<ProductoDialog>("Editar producto", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true });
+
+        if ((await dialog.Result) is { Canceled: false })
+        {
+            await CargarProductosAsync();
+        }
+    }
+
+    private static Color ColorEstadoVehiculo(string estado) => estado switch
+    {
+        Estados.VehiculoDisponible => Color.Success,
+        Estados.VehiculoEnRuta => Color.Info,
+        Estados.VehiculoMantenimiento => Color.Warning,
+        Estados.VehiculoInhabilitado => Color.Error,
+        _ => Color.Default
+    };
+}

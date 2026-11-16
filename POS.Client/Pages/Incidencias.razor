@@ -1,0 +1,135 @@
+@page "/incidencias"
+@attribute [Authorize]
+@inject ApiClient Api
+@inject CatalogosService Catalogos
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+
+<PageTitle>LogiTrack Solutions · Incidencias</PageTitle>
+
+<div class="d-flex justify-space-between align-center flex-wrap gap-3 mb-4">
+    <div>
+        <MudText Typo="Typo.h4" Style="font-weight:800;">Incidencias</MudText>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">
+            Registro de eventos que afectan la trazabilidad de los envíos.
+        </MudText>
+    </div>
+    <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh"
+               OnClick="BuscarAsync">Actualizar</MudButton>
+</div>
+
+<MudPaper Elevation="2" Class="pa-4 mb-4">
+    <div class="d-flex gap-2 align-center flex-wrap">
+        <MudSelect T="int?" @bind-Value="_idTipo" @bind-Value:after="BuscarAsync" Label="Tipo de incidencia"
+                   Variant="Variant.Outlined" Clearable="true" AnchorOrigin="Origin.BottomCenter"
+                   Style="min-width:260px;">
+            @foreach (var tipo in _tipos)
+            {
+                <MudSelectItem T="int?" Value="@tipo.IdTipoIncidencia">@tipo.Nombre</MudSelectItem>
+            }
+        </MudSelect>
+        <MudText Typo="Typo.caption" Class="mud-text-secondary">
+            La visibilidad de las incidencias depende de su rol (RN13).
+        </MudText>
+    </div>
+</MudPaper>
+
+<MudPaper Elevation="2">
+    <MudTable @ref="_tabla" ServerData="CargarAsync" Dense="true" Hover="true" Striped="true" Breakpoint="Breakpoint.Sm">
+        <HeaderContent>
+            <MudTh>Fecha</MudTh>
+            <MudTh>Guía</MudTh>
+            <MudTh>Tipo</MudTh>
+            <MudTh>Descripción</MudTh>
+            <MudTh>Reportada por</MudTh>
+            <MudTh align="Right">Evidencia</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.FechaHora.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</MudTd>
+            <MudTd>
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary"
+                         Href="@($"/guias/{context.IdGuia}")">
+                    @context.CodigoGuia
+                </MudChip>
+            </MudTd>
+            <MudTd>
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="Color.Warning">
+                    @context.TipoIncidencia
+                </MudChip>
+            </MudTd>
+            <MudTd>@context.Descripcion</MudTd>
+            <MudTd>@context.Usuario</MudTd>
+            <MudTd align="Right">
+                @if (!string.IsNullOrWhiteSpace(context.RutaFoto))
+                {
+                    <MudImage Src="@context.RutaFoto" Width="64" Height="48" Class="rounded"
+                              ObjectFit="ObjectFit.Cover" Style="cursor:zoom-in;"
+                              @onclick="@(() => AbrirImagen(context.RutaFoto))" />
+                }
+                else
+                {
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">Sin foto</MudText>
+                }
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Typo="Typo.body2" Class="mud-text-secondary py-4">No hay incidencias registradas.</MudText>
+        </NoRecordsContent>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new[] { 10, 20, 50, 100 }" RowsPerPageString="Filas por página" />
+        </PagerContent>
+    </MudTable>
+</MudPaper>
+
+@code {
+    private MudTable<IncidenciaDto> _tabla = default!;
+    private List<TipoIncidenciaDto> _tipos = new();
+    private int? _idTipo;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var cat = await Catalogos.GetAsync();
+            _tipos = cat.TiposIncidencia;
+        }
+        catch (ApiException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task<TableData<IncidenciaDto>> CargarAsync(TableState state, CancellationToken token)
+    {
+        try
+        {
+            var url = $"api/incidencias?page={state.Page + 1}&pageSize={state.PageSize}";
+            if (_idTipo.HasValue)
+            {
+                url += $"&idTipoIncidencia={_idTipo.Value}";
+            }
+
+            var data = await Api.GetAsync<PagedResult<IncidenciaDto>>(url);
+            return new TableData<IncidenciaDto>
+            {
+                Items = data?.Items ?? new List<IncidenciaDto>(),
+                TotalItems = data?.Total ?? 0
+            };
+        }
+        catch (ApiException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+            return new TableData<IncidenciaDto> { Items = new List<IncidenciaDto>(), TotalItems = 0 };
+        }
+    }
+
+    private Task BuscarAsync() => _tabla == null ? Task.CompletedTask : _tabla.ReloadServerData();
+
+    private async Task AbrirImagen(string ruta)
+    {
+        if (!string.IsNullOrWhiteSpace(ruta))
+        {
+            await JS.InvokeVoidAsync("open", ruta, "_blank");
+        }
+    }
+}

@@ -1,0 +1,104 @@
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-weight:700;">@(Edicion ? "Editar cliente" : "Nuevo cliente")</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mb-4">@_error</MudAlert>
+        }
+
+        <MudTextField @bind-Value="_razonSocial" Label="Razón social" Variant="Variant.Outlined"
+                      MaxLength="150" Required="true" Class="mb-3" />
+        <MudTextField @bind-Value="_nit" Label="NIT" Variant="Variant.Outlined" MaxLength="30"
+                      Required="true" Class="mb-3" />
+        <MudTextField @bind-Value="_telefono" Label="Teléfono" Variant="Variant.Outlined" MaxLength="25"
+                      Class="mb-3" />
+        <MudTextField @bind-Value="_direccion" Label="Dirección" Variant="Variant.Outlined" MaxLength="200" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar" Variant="Variant.Text">Cancelar</MudButton>
+        <MudButton OnClick="GuardarAsync" Variant="Variant.Filled" Color="Color.Primary" Disabled="_guardando">
+            @if (_guardando)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" Color="Color.Inherit" />
+            }
+            @(Edicion ? "Guardar cambios" : "Crear cliente")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public ClienteDto? Cliente { get; set; }
+    [Parameter] public bool Edicion { get; set; }
+
+    [Inject] private ApiClient Api { get; set; } = default!;
+    [Inject] private CatalogosService Catalogos { get; set; } = default!;
+    [Inject] private ISnackbar Snackbar { get; set; } = default!;
+
+    private string _razonSocial = string.Empty;
+    private string _nit = string.Empty;
+    private string? _telefono;
+    private string? _direccion;
+    private bool _guardando;
+    private string? _error;
+
+    protected override void OnInitialized()
+    {
+        if (Edicion && Cliente != null)
+        {
+            _razonSocial = Cliente.RazonSocial;
+            _nit = Cliente.Nit;
+            _telefono = Cliente.Telefono;
+            _direccion = Cliente.Direccion;
+        }
+    }
+
+    private async Task GuardarAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_razonSocial) || string.IsNullOrWhiteSpace(_nit))
+        {
+            _error = "La razón social y el NIT son obligatorios.";
+            return;
+        }
+
+        _guardando = true;
+        _error = null;
+
+        try
+        {
+            var request = new CrearClienteRequest
+            {
+                RazonSocial = _razonSocial.Trim(),
+                Nit = _nit.Trim(),
+                Telefono = string.IsNullOrWhiteSpace(_telefono) ? null : _telefono.Trim(),
+                Direccion = string.IsNullOrWhiteSpace(_direccion) ? null : _direccion.Trim()
+            };
+
+            if (Edicion && Cliente != null)
+            {
+                await Api.PutAsync<ClienteDto>($"api/clientes/{Cliente.IdCliente}", request);
+                Snackbar.Add("Cliente actualizado correctamente.", Severity.Success);
+            }
+            else
+            {
+                await Api.PostAsync<ClienteDto>("api/clientes", request);
+                Snackbar.Add("Cliente registrado correctamente.", Severity.Success);
+            }
+
+            Catalogos.Invalidar();
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _guardando = false;
+        }
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+}

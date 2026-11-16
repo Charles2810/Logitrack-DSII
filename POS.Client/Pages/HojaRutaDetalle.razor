@@ -1,0 +1,172 @@
+@page "/hojas-ruta/{Id:int}"
+@attribute [Authorize(Roles = "Administrador del Sistema,Administrador Logístico,Conductor/Operador,Centro de Control/Supervisor")]
+@inject ApiClient Api
+@inject IDialogService DialogService
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>LogiTrack Solutions · Hoja de ruta</PageTitle>
+
+<MudButton Href="/hojas-ruta" Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.ArrowBack"
+           Class="mb-2">Volver a hojas de ruta</MudButton>
+
+@if (_cargando)
+{
+    <div class="d-flex justify-center my-10"><MudProgressCircular Indeterminate="true" /></div>
+}
+else if (_hoja == null)
+{
+    <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">@_error</MudAlert>
+}
+else
+{
+    <div class="d-flex justify-space-between align-center flex-wrap gap-3 mb-4">
+        <div>
+            <div class="d-flex align-center gap-3 flex-wrap">
+                <MudText Typo="Typo.h4" Style="font-weight:800;">Hoja de ruta #@_hoja.IdHojaRuta</MudText>
+                <MudChip T="string" Color="@ColorEstado(_hoja.Estado)" Variant="Variant.Filled">@_hoja.Estado</MudChip>
+            </div>
+            <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                Creada por @_hoja.UsuarioCreador el @_hoja.FechaCreacion.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+            </MudText>
+        </div>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh"
+                   OnClick="CargarAsync">Actualizar</MudButton>
+    </div>
+
+    <MudGrid Spacing="3" Class="mb-2">
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="2" Class="pa-4">
+                <MudText Typo="Typo.overline" Class="mud-text-secondary">Vehículo</MudText>
+                <MudText Typo="Typo.h6">@_hoja.VehiculoPlaca</MudText>
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">@_hoja.VehiculoTipo</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="2" Class="pa-4">
+                <MudText Typo="Typo.overline" Class="mud-text-secondary">Conductor</MudText>
+                <MudText Typo="Typo.h6">@_hoja.Conductor</MudText>
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">Operador asignado</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="2" Class="pa-4">
+                <MudText Typo="Typo.overline" Class="mud-text-secondary">Carga total</MudText>
+                <MudText Typo="Typo.h6">@_hoja.PesoTotal.ToString("N1") kg</MudText>
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">@_hoja.VolumenTotal.ToString("N2") m³</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="2" Class="pa-4">
+                <MudText Typo="Typo.overline" Class="mud-text-secondary">Avance</MudText>
+                <MudText Typo="Typo.h6">@_hoja.GuiasEntregadas / @_hoja.TotalGuias guías</MudText>
+                <MudProgressLinear Color="Color.Success" Rounded="true" Size="Size.Small" Class="mt-2"
+                                   Value="@(_hoja.TotalGuias == 0 ? 0 : _hoja.GuiasEntregadas * 100 / _hoja.TotalGuias)" />
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudPaper Elevation="2">
+        <div class="d-flex justify-space-between align-center pa-4">
+            <MudText Typo="Typo.h6" Style="font-weight:700;">Guías asignadas</MudText>
+            <MudText Typo="Typo.caption" Class="mud-text-secondary">@_hoja.Guias.Count guía(s)</MudText>
+        </div>
+        <MudTable Items="_hoja.Guias" Dense="true" Hover="true" Striped="true" Breakpoint="Breakpoint.Sm">
+            <HeaderContent>
+                <MudTh>Código</MudTh>
+                <MudTh>Destinatario</MudTh>
+                <MudTh>Estado</MudTh>
+                <MudTh>Peso</MudTh>
+                <MudTh align="Right">Acciones</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd><b>@context.CodigoGuia</b></MudTd>
+                <MudTd>
+                    <div>@context.Destinatario</div>
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">@context.DireccionDestino</MudText>
+                </MudTd>
+                <MudTd>
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="@ColorHito(context.HitoActual)">
+                        @context.HitoActual
+                    </MudChip>
+                </MudTd>
+                <MudTd>@context.PesoKg.ToString("N1") kg</MudTd>
+                <MudTd align="Right">
+                    <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary"
+                               Href="@($"/guias/{context.IdGuia}")">Ver guía</MudButton>
+                    <AuthorizeView Roles="@($"{Roles.Conductor},{Roles.PersonalAlmacen}")" Context="op">
+                        <MudIconButton Icon="@Icons.Material.Filled.AddLocationAlt" Size="Size.Small" Color="Color.Secondary"
+                                       title="Registrar checkpoint" OnClick="@(() => CheckpointAsync(context))"
+                                       Disabled="@(context.HitoActual == Hitos.Entregado)" />
+                    </AuthorizeView>
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary pa-4">
+                    Esta hoja de ruta aún no tiene guías asignadas. Asígnelas desde el detalle de cada guía.
+                </MudText>
+            </NoRecordsContent>
+        </MudTable>
+    </MudPaper>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private HojaRutaDto? _hoja;
+    private bool _cargando = true;
+    private string _error = string.Empty;
+
+    protected override async Task OnParametersSetAsync() => await CargarAsync();
+
+    private async Task CargarAsync()
+    {
+        _cargando = true;
+        try
+        {
+            _hoja = await Api.GetAsync<HojaRutaDto>($"api/hojas-ruta/{Id}");
+            if (_hoja == null)
+            {
+                _error = "Hoja de ruta no encontrada o sin acceso para su rol.";
+            }
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    private async Task CheckpointAsync(GuiaDto guia)
+    {
+        var parameters = new DialogParameters { { nameof(CheckpointDialog.Guia), guia } };
+        var dialog = await DialogService.ShowAsync<CheckpointDialog>("Registrar checkpoint", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true });
+
+        if ((await dialog.Result) is { Canceled: false })
+        {
+            await CargarAsync();
+        }
+    }
+
+    private static Color ColorEstado(string estado) => estado switch
+    {
+        Estados.HojaPendiente => Color.Warning,
+        Estados.HojaEnCurso => Color.Info,
+        Estados.HojaFinalizada => Color.Success,
+        _ => Color.Default
+    };
+
+    private static Color ColorHito(string hito) => hito switch
+    {
+        Hitos.Entregado => Color.Success,
+        Hitos.EnTransito or Hitos.EnRepartoFinal => Color.Info,
+        Hitos.EnCentroDistribucion or Hitos.SalidaAlmacen => Color.Warning,
+        Hitos.Registrada => Color.Default,
+        _ => Color.Primary
+    };
+}

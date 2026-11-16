@@ -1,0 +1,176 @@
+@page "/inventario"
+@attribute [Authorize(Roles = "Administrador del Sistema,Administrador Logístico,Personal de Almacén")]
+@inject ApiClient Api
+@inject CatalogosService Catalogos
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>LogiTrack Solutions · Existencias</PageTitle>
+
+<div class="d-flex justify-space-between align-center flex-wrap gap-3 mb-4">
+    <div>
+        <MudText Typo="Typo.h4" Style="font-weight:800;">Existencias</MudText>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">
+            Stock por almacén y producto, con alertas de reposición.
+        </MudText>
+    </div>
+    <div class="d-flex gap-2">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.SwapVert"
+                   Href="/inventario/movimientos">Ver movimientos</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="@(() => NuevoMovimientoAsync())">Registrar movimiento</MudButton>
+    </div>
+</div>
+
+<MudPaper Elevation="2" Class="pa-4 mb-4">
+    <MudGrid Spacing="2">
+        <MudItem xs="12" md="4">
+            <MudSelect T="int?" @bind-Value="_idAlmacen" @bind-Value:after="CargarAsync" Label="Almacén"
+                       Variant="Variant.Outlined" Clearable="true" AnchorOrigin="Origin.BottomCenter">
+                @foreach (var a in _almacenes)
+                {
+                    <MudSelectItem T="int?" Value="@a.IdAlmacen">@a.Nombre · @a.Ciudad</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <MudTextField @bind-Value="_buscar" Label="Buscar SKU o producto" Variant="Variant.Outlined"
+                          Immediate="true" Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          DebounceInterval="400" OnDebounceIntervalElapsed="@(_ => CargarAsync())" />
+        </MudItem>
+        <MudItem xs="12" md="4" Class="d-flex gap-2 align-center">
+            <MudNumericField T="int" @bind-Value="_umbral" @bind-Value:after="CargarAsync"
+                             Label="Umbral de alerta" Variant="Variant.Outlined" Min="0"
+                             Style="max-width:170px;" />
+            <MudButton Variant="Variant.Outlined" Color="Color.Warning" StartIcon="@Icons.Material.Filled.Warning"
+                       OnClick="CargarAsync">Alertas</MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (_alertas.Count > 0)
+{
+    <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mb-4" Icon="@Icons.Material.Filled.Warning">
+        <b>@_alertas.Count producto(s) por debajo del umbral de @_umbral unidades:</b>
+        <div class="d-flex flex-wrap gap-2 mt-2">
+            @foreach (var alerta in _alertas.Take(12))
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Filled">
+                    @alerta.Sku · @alerta.Almacen: @alerta.StockActual
+                </MudChip>
+            }
+        </div>
+    </MudAlert>
+}
+
+<MudPaper Elevation="2">
+    <MudTable Items="_items" Loading="_cargando" Dense="true" Hover="true" Striped="true" Breakpoint="Breakpoint.Sm">
+        <HeaderContent>
+            <MudTh>Almacén</MudTh>
+            <MudTh>SKU</MudTh>
+            <MudTh>Producto</MudTh>
+            <MudTh align="Right">Stock actual</MudTh>
+            <MudTh align="Right">Estado</MudTh>
+            <MudTh align="Right">Acciones</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.Almacen</MudTd>
+            <MudTd><b>@context.Sku</b></MudTd>
+            <MudTd>@context.Producto</MudTd>
+            <MudTd align="Right">@context.StockActual</MudTd>
+            <MudTd align="Right">
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Filled"
+                         Color="@(context.StockActual == 0 ? Color.Error : context.StockActual <= _umbral ? Color.Warning : Color.Success)">
+                    @(context.StockActual == 0 ? "Sin stock" : context.StockActual <= _umbral ? "Bajo" : "Disponible")
+                </MudChip>
+            </MudTd>
+            <MudTd align="Right">
+                <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.SwapVert"
+                           OnClick="@(() => NuevoMovimientoAsync(context.IdAlmacen, context.IdProducto))">
+                    Movimiento
+                </MudButton>
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Typo="Typo.body2" Class="mud-text-secondary py-4">No hay existencias para los filtros aplicados.</MudText>
+        </NoRecordsContent>
+    </MudTable>
+</MudPaper>
+
+@code {
+    private List<InventarioDto> _items = new();
+    private List<InventarioDto> _alertas = new();
+    private List<AlmacenDto> _almacenes = new();
+    private int? _idAlmacen;
+    private string? _buscar;
+    private int _umbral = 20;
+    private bool _cargando = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var cat = await Catalogos.GetAsync();
+            _almacenes = cat.Almacenes;
+        }
+        catch (ApiException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+
+        await CargarAsync();
+    }
+
+    private async Task CargarAsync()
+    {
+        _cargando = true;
+        try
+        {
+            var url = "api/inventario";
+            var query = new List<string>();
+            if (_idAlmacen.HasValue)
+            {
+                query.Add($"idAlmacen={_idAlmacen.Value}");
+            }
+            if (!string.IsNullOrWhiteSpace(_buscar))
+            {
+                query.Add($"buscar={Uri.EscapeDataString(_buscar.Trim())}");
+            }
+            if (query.Count > 0)
+            {
+                url += "?" + string.Join("&", query);
+            }
+
+            _items = await Api.GetAsync<List<InventarioDto>>(url) ?? new();
+            _alertas = await Api.GetAsync<List<InventarioDto>>($"api/inventario/alertas?umbral={_umbral}") ?? new();
+        }
+        catch (ApiException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    private async Task NuevoMovimientoAsync(int? idAlmacen = null, int? idProducto = null)
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(MovimientoDialog.IdAlmacenInicial), idAlmacen ?? _idAlmacen },
+            { nameof(MovimientoDialog.IdProductoInicial), idProducto }
+        };
+
+        var dialog = await DialogService.ShowAsync<MovimientoDialog>("Movimiento de inventario", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true });
+
+        if ((await dialog.Result) is { Canceled: false })
+        {
+            Catalogos.Invalidar();
+            await CargarAsync();
+        }
+    }
+}

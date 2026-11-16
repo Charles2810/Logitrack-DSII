@@ -1,0 +1,116 @@
+@page "/clientes"
+@attribute [Authorize(Roles = "Administrador del Sistema,Administrador Logístico")]
+@inject ApiClient Api
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>LogiTrack Solutions · Clientes</PageTitle>
+
+<div class="d-flex justify-space-between align-center flex-wrap gap-3 mb-4">
+    <div>
+        <MudText Typo="Typo.h4" Style="font-weight:800;">Clientes</MudText>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">
+            Empresas que contratan los servicios logísticos.
+        </MudText>
+    </div>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+               OnClick="NuevoAsync">Nuevo cliente</MudButton>
+</div>
+
+<MudPaper Elevation="2" Class="pa-4 mb-4">
+    <div class="d-flex gap-2 align-center flex-wrap">
+        <MudTextField @bind-Value="_buscar" Label="Buscar razón social o NIT" Variant="Variant.Outlined"
+                      Immediate="true" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                      DebounceInterval="400" OnDebounceIntervalElapsed="@(_ => CargarAsync())"
+                      Style="min-width:300px;" />
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh"
+                   OnClick="CargarAsync">Actualizar</MudButton>
+    </div>
+</MudPaper>
+
+<MudPaper Elevation="2">
+    <MudTable Items="_items" Loading="_cargando" Dense="true" Hover="true" Striped="true" Breakpoint="Breakpoint.Sm">
+        <HeaderContent>
+            <MudTh>Razón social</MudTh>
+            <MudTh>NIT</MudTh>
+            <MudTh>Teléfono</MudTh>
+            <MudTh>Dirección</MudTh>
+            <MudTh align="Right">Acciones</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd><b>@context.RazonSocial</b></MudTd>
+            <MudTd>@context.Nit</MudTd>
+            <MudTd>@(context.Telefono ?? "—")</MudTd>
+            <MudTd>@(context.Direccion ?? "—")</MudTd>
+            <MudTd align="Right">
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
+                               title="Editar cliente" OnClick="@(() => EditarAsync(context))" />
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Typo="Typo.body2" Class="mud-text-secondary py-4">
+                No se encontraron clientes con el filtro aplicado.
+            </MudText>
+        </NoRecordsContent>
+    </MudTable>
+</MudPaper>
+
+@code {
+    private List<ClienteDto> _items = new();
+    private string? _buscar;
+    private bool _cargando = true;
+
+    protected override Task OnInitializedAsync() => CargarAsync();
+
+    private async Task CargarAsync()
+    {
+        _cargando = true;
+        try
+        {
+            var url = "api/clientes";
+            if (!string.IsNullOrWhiteSpace(_buscar))
+            {
+                url += $"?buscar={Uri.EscapeDataString(_buscar.Trim())}";
+            }
+
+            _items = await Api.GetAsync<List<ClienteDto>>(url) ?? new();
+        }
+        catch (ApiException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    private async Task NuevoAsync()
+    {
+        var parameters = new DialogParameters { { nameof(ClienteDialog.Edicion), false } };
+        var dialog = await DialogService.ShowAsync<ClienteDialog>("Nuevo cliente", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true });
+
+        if ((await dialog.Result) is { Canceled: false })
+        {
+            await CargarAsync();
+        }
+    }
+
+    private async Task EditarAsync(ClienteDto cliente)
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(ClienteDialog.Cliente), cliente },
+            { nameof(ClienteDialog.Edicion), true }
+        };
+
+        var dialog = await DialogService.ShowAsync<ClienteDialog>("Editar cliente", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true });
+
+        if ((await dialog.Result) is { Canceled: false })
+        {
+            await CargarAsync();
+        }
+    }
+}

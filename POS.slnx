@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="POS.Client/POS.Client.csproj" />
+  <Project Path="POS.Server/POS.Server.csproj" />
+  <Project Path="POS.Shared/POS.Shared.csproj" />
+</Solution>

@@ -1,0 +1,282 @@
+@page "/reportes"
+@attribute [Authorize(Roles = "Administrador del Sistema,Administrador Logístico,Centro de Control/Supervisor")]
+@inject ApiClient Api
+@inject CatalogosService Catalogos
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+
+<PageTitle>LogiTrack Solutions · Reportes</PageTitle>
+
+<div class="d-flex justify-space-between align-center flex-wrap gap-3 mb-4">
+    <div>
+        <MudText Typo="Typo.h4" Style="font-weight:800;">Reportes de envíos</MudText>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">
+            Consulta consolidada por estado, cliente y rango de fechas, con exportación a CSV.
+        </MudText>
+    </div>
+    <div class="d-flex gap-2">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh"
+                   OnClick="BuscarAsync" Disabled="_cargando">Actualizar</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.Download"
+                   OnClick="ExportarCsvAsync" Disabled="@(_items.Count == 0)">Exportar CSV</MudButton>
+    </div>
+</div>
+
+<MudPaper Elevation="2" Class="pa-4 mb-4">
+    <MudGrid Spacing="2">
+        <MudItem xs="12" md="3">
+            <MudTextField @bind-Value="_buscar" Label="Buscar código, cliente o destinatario"
+                          Variant="Variant.Outlined" Immediate="true" Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          DebounceInterval="400" OnDebounceIntervalElapsed="@(_ => BuscarAsync())" />
+        </MudItem>
+        <MudItem xs="12" md="2">
+            <MudSelect T="string" @bind-Value="_estado" @bind-Value:after="BuscarAsync" Label="Estado"
+                       Variant="Variant.Outlined" Clearable="true" AnchorOrigin="Origin.BottomCenter">
+                @foreach (var h in _hitos)
+                {
+                    <MudSelectItem T="string" Value="@h.Nombre">@h.Nombre</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="2">
+            <MudSelect T="int?" @bind-Value="_idCliente" @bind-Value:after="BuscarAsync" Label="Cliente"
+                       Variant="Variant.Outlined" Clearable="true" AnchorOrigin="Origin.BottomCenter">
+                @foreach (var c in _clientes)
+                {
+                    <MudSelectItem T="int?" Value="@c.IdCliente">@c.RazonSocial</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="6" md="2">
+            <MudDatePicker @bind-Date="_desde" Label="Desde" Variant="Variant.Outlined" Editable="true"
+                           @bind-Date:after="BuscarAsync" />
+        </MudItem>
+        <MudItem xs="6" md="2">
+            <MudDatePicker @bind-Date="_hasta" Label="Hasta" Variant="Variant.Outlined" Editable="true"
+                           @bind-Date:after="BuscarAsync" />
+        </MudItem>
+        <MudItem xs="12" md="1" Class="d-flex align-center">
+            <MudSwitch @bind-Value="_conIncidencias" @bind-Value:after="BuscarAsync" Color="Color.Warning"
+                       Label="Solo con incidencias" LabelPlacement="Placement.Start" />
+        </MudItem>
+        <MudItem xs="12" Class="d-flex gap-3 align-center flex-wrap">
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.FilterAlt"
+                       OnClick="BuscarAsync">Aplicar filtros</MudButton>
+            <MudButton Variant="Variant.Text" Color="Color.Default" OnClick="LimpiarAsync">Limpiar</MudButton>
+            <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                Mostrando @_items.Count registro(s) · máximo 500 por consulta.
+            </MudText>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+<MudGrid Spacing="3" Class="mb-4">
+    <MudItem xs="12" sm="4">
+        <MudPaper Elevation="2" Class="pa-4">
+            <MudText Typo="Typo.overline" Class="mud-text-secondary">Envíos listados</MudText>
+            <MudText Typo="Typo.h4" Style="font-weight:800;">@_items.Count</MudText>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" sm="4">
+        <MudPaper Elevation="2" Class="pa-4">
+            <MudText Typo="Typo.overline" Class="mud-text-secondary">Entregados</MudText>
+            <MudText Typo="Typo.h4" Style="font-weight:800;">@_items.Count(i => i.EstadoActual == Hitos.Entregado)</MudText>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" sm="4">
+        <MudPaper Elevation="2" Class="pa-4">
+            <MudText Typo="Typo.overline" Class="mud-text-secondary">Con incidencias</MudText>
+            <MudText Typo="Typo.h4" Style="font-weight:800;">@_items.Count(i => i.TotalIncidencias > 0)</MudText>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+<MudPaper Elevation="2">
+    <MudTable Items="_items" Loading="_cargando" Dense="true" Hover="true" Striped="true" Breakpoint="Breakpoint.Sm">
+        <HeaderContent>
+            <MudTh>Código</MudTh>
+            <MudTh>Registro</MudTh>
+            <MudTh>Cliente</MudTh>
+            <MudTh>Destino</MudTh>
+            <MudTh>Estado</MudTh>
+            <MudTh>Vehículo / conductor</MudTh>
+            <MudTh align="Right">Peso (kg)</MudTh>
+            <MudTh align="Right">Horas tránsito</MudTh>
+            <MudTh align="Right">Incidencias</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>
+                <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" Class="px-0"
+                           Href="@($"/guias/{context.IdGuia}")">@context.CodigoGuia</MudButton>
+            </MudTd>
+            <MudTd>@context.FechaRegistro.ToLocalTime().ToString("dd/MM/yyyy")</MudTd>
+            <MudTd>@context.Cliente</MudTd>
+            <MudTd>
+                <div>@context.Destinatario</div>
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">@context.DireccionDestino</MudText>
+            </MudTd>
+            <MudTd>
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="@ColorHito(context.EstadoActual)">
+                    @context.EstadoActual
+                </MudChip>
+            </MudTd>
+            <MudTd>
+                <div>@(context.Vehiculo ?? "—")</div>
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">@(context.Conductor ?? "Sin asignar")</MudText>
+            </MudTd>
+            <MudTd align="Right">@context.PesoKg.ToString("N1")</MudTd>
+            <MudTd align="Right">@(context.HorasTransito?.ToString("N1") ?? "—")</MudTd>
+            <MudTd align="Right">
+                @if (context.TotalIncidencias > 0)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Filled">
+                        @context.TotalIncidencias
+                    </MudChip>
+                }
+                else
+                {
+                    <span>0</span>
+                }
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Typo="Typo.body2" Class="mud-text-secondary py-4">
+                No se encontraron envíos con los filtros aplicados.
+            </MudText>
+        </NoRecordsContent>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new[] { 25, 50, 100 }" RowsPerPageString="Filas por página" />
+        </PagerContent>
+    </MudTable>
+</MudPaper>
+
+@code {
+    private readonly List<ReporteEnvioDto> _items = new();
+    private List<HitoDto> _hitos = new();
+    private List<ClienteDto> _clientes = new();
+    private bool _cargando = true;
+
+    private string? _buscar;
+    private string? _estado;
+    private int? _idCliente;
+    private DateTime? _desde;
+    private DateTime? _hasta;
+    private bool _conIncidencias;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var cat = await Catalogos.GetAsync();
+            _hitos = cat.Hitos;
+            _clientes = cat.Clientes;
+        }
+        catch (ApiException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+
+        await BuscarAsync();
+    }
+
+    private async Task BuscarAsync()
+    {
+        _cargando = true;
+        try
+        {
+            var query = new List<string> { "limite=500" };
+
+            if (!string.IsNullOrWhiteSpace(_buscar)) query.Add($"buscar={Uri.EscapeDataString(_buscar.Trim())}");
+            if (!string.IsNullOrWhiteSpace(_estado)) query.Add($"estado={Uri.EscapeDataString(_estado)}");
+            if (_idCliente.HasValue)
+            {
+                var cliente = _clientes.FirstOrDefault(c => c.IdCliente == _idCliente.Value);
+                if (cliente != null)
+                {
+                    query.Add($"cliente={Uri.EscapeDataString(cliente.RazonSocial)}");
+                }
+            }
+            if (_desde.HasValue) query.Add($"desde={_desde.Value:yyyy-MM-dd}");
+            if (_hasta.HasValue) query.Add($"hasta={_hasta.Value:yyyy-MM-dd}");
+            if (_conIncidencias) query.Add("conIncidencias=true");
+
+            var datos = await Api.GetAsync<List<ReporteEnvioDto>>("api/reportes/envios?" + string.Join("&", query))
+                        ?? new List<ReporteEnvioDto>();
+
+            _items.Clear();
+            _items.AddRange(datos);
+        }
+        catch (ApiException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    private async Task LimpiarAsync()
+    {
+        _buscar = null;
+        _estado = null;
+        _idCliente = null;
+        _desde = null;
+        _hasta = null;
+        _conIncidencias = false;
+        await BuscarAsync();
+    }
+
+    private async Task ExportarCsvAsync()
+    {
+        if (_items.Count == 0)
+        {
+            return;
+        }
+
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("Codigo,Registro,Cliente,Almacen origen,Tipo carga,Destinatario,Direccion,Estado,Peso kg,Volumen m3,Vehiculo,Conductor,Fecha entrega,Horas transito,Incidencias");
+
+        foreach (var i in _items)
+        {
+            sb.AppendLine(string.Join(",",
+                Csv(i.CodigoGuia),
+                i.FechaRegistro.ToLocalTime().ToString("dd/MM/yyyy HH:mm"),
+                Csv(i.Cliente),
+                Csv(i.AlmacenOrigen),
+                Csv(i.TipoCarga),
+                Csv(i.Destinatario),
+                Csv(i.DireccionDestino),
+                Csv(i.EstadoActual),
+                i.PesoKg.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture),
+                i.VolumenM3.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture),
+                Csv(i.Vehiculo ?? string.Empty),
+                Csv(i.Conductor ?? string.Empty),
+                i.FechaEntrega?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? string.Empty,
+                i.HorasTransito?.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty,
+                i.TotalIncidencias.ToString()));
+        }
+
+        var nombre = $"logitrack-envios-{DateTime.Now:yyyyMMdd-HHmm}.csv";
+        await JS.InvokeVoidAsync("logitrack.descargarTexto", nombre, sb.ToString(), "text/csv");
+        Snackbar.Add("Reporte exportado en formato CSV.", Severity.Success);
+    }
+
+    private static string Csv(string valor)
+    {
+        var limpio = valor.Replace("\"", "\"\"");
+        return limpio.Contains(',') || limpio.Contains('"') || limpio.Contains('\n')
+            ? $"\"{limpio}\""
+            : limpio;
+    }
+
+    private static Color ColorHito(string hito) => hito switch
+    {
+        Hitos.Entregado => Color.Success,
+        Hitos.EnTransito or Hitos.EnRepartoFinal => Color.Info,
+        Hitos.EnCentroDistribucion or Hitos.SalidaAlmacen => Color.Warning,
+        Hitos.Registrada => Color.Default,
+        _ => Color.Primary
+    };
+}

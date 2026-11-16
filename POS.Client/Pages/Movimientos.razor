@@ -1,0 +1,181 @@
+@page "/inventario/movimientos"
+@attribute [Authorize(Roles = "Administrador del Sistema,Administrador Logístico,Personal de Almacén")]
+@inject ApiClient Api
+@inject CatalogosService Catalogos
+@inject ISnackbar Snackbar
+
+<PageTitle>LogiTrack Solutions · Movimientos de inventario</PageTitle>
+
+<MudButton Href="/inventario" Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.ArrowBack"
+           Class="mb-2">Volver a existencias</MudButton>
+
+<div class="d-flex justify-space-between align-center flex-wrap gap-3 mb-4">
+    <div>
+        <MudText Typo="Typo.h4" Style="font-weight:800;">Movimientos de inventario</MudText>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">
+            Historial de entradas y salidas de stock por almacén.
+        </MudText>
+    </div>
+</div>
+
+<MudPaper Elevation="2" Class="pa-4 mb-4">
+    <MudGrid Spacing="2">
+        <MudItem xs="12" md="3">
+            <MudSelect T="int?" @bind-Value="_idAlmacen" @bind-Value:after="BuscarAsync" Label="Almacén"
+                       Variant="Variant.Outlined" Clearable="true" AnchorOrigin="Origin.BottomCenter">
+                @foreach (var a in _almacenes)
+                {
+                    <MudSelectItem T="int?" Value="@a.IdAlmacen">@a.Nombre · @a.Ciudad</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudSelect T="int?" @bind-Value="_idProducto" @bind-Value:after="BuscarAsync" Label="Producto"
+                       Variant="Variant.Outlined" Clearable="true" AnchorOrigin="Origin.BottomCenter">
+                @foreach (var p in _productos)
+                {
+                    <MudSelectItem T="int?" Value="@p.IdProducto">@p.Sku · @p.Nombre</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="6" md="2">
+            <MudSelect T="string" @bind-Value="_tipo" @bind-Value:after="BuscarAsync" Label="Tipo"
+                       Variant="Variant.Outlined" Clearable="true" AnchorOrigin="Origin.BottomCenter">
+                <MudSelectItem T="string" Value="@Estados.TipoEntrada">ENTRADA</MudSelectItem>
+                <MudSelectItem T="string" Value="@Estados.TipoSalida">SALIDA</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="6" md="2">
+            <MudDatePicker @bind-Date="_desde" Label="Desde" Variant="Variant.Outlined" Editable="true"
+                           @bind-Date:after="BuscarAsync" />
+        </MudItem>
+        <MudItem xs="6" md="2">
+            <MudDatePicker @bind-Date="_hasta" Label="Hasta" Variant="Variant.Outlined" Editable="true"
+                           @bind-Date:after="BuscarAsync" />
+        </MudItem>
+        <MudItem xs="12" Class="d-flex gap-2">
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.FilterAlt"
+                       OnClick="BuscarAsync">Filtrar</MudButton>
+            <MudButton Variant="Variant.Text" Color="Color.Default" OnClick="LimpiarAsync">Limpiar filtros</MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+<MudPaper Elevation="2">
+    <MudTable @ref="_tabla" ServerData="CargarAsync" Dense="true" Hover="true" Striped="true" Breakpoint="Breakpoint.Sm">
+        <HeaderContent>
+            <MudTh>Fecha</MudTh>
+            <MudTh>Almacén</MudTh>
+            <MudTh>SKU</MudTh>
+            <MudTh>Producto</MudTh>
+            <MudTh>Tipo</MudTh>
+            <MudTh align="Right">Cantidad</MudTh>
+            <MudTh>Guía</MudTh>
+            <MudTh>Usuario</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.FechaHora.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</MudTd>
+            <MudTd>@context.Almacen</MudTd>
+            <MudTd><b>@context.Sku</b></MudTd>
+            <MudTd>@context.Producto</MudTd>
+            <MudTd>
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Filled"
+                         Color="@(context.TipoMovimiento == Estados.TipoEntrada ? Color.Success : Color.Warning)">
+                    @context.TipoMovimiento
+                </MudChip>
+            </MudTd>
+            <MudTd align="Right">
+                <b>@(context.TipoMovimiento == Estados.TipoEntrada ? "+" : "−")@context.Cantidad</b>
+            </MudTd>
+            <MudTd>
+                @if (context.IdGuia.HasValue)
+                {
+                    <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary"
+                               Href="@($"/guias/{context.IdGuia}")">@context.CodigoGuia</MudButton>
+                }
+                else
+                {
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">—</MudText>
+                }
+            </MudTd>
+            <MudTd>@context.Usuario</MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Typo="Typo.body2" Class="mud-text-secondary py-4">
+                No hay movimientos para los filtros aplicados.
+            </MudText>
+        </NoRecordsContent>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new[] { 10, 20, 50, 100 }" RowsPerPageString="Filas por página" />
+        </PagerContent>
+    </MudTable>
+</MudPaper>
+
+@code {
+    private MudTable<MovimientoInventarioDto> _tabla = default!;
+    private List<AlmacenDto> _almacenes = new();
+    private List<ProductoDto> _productos = new();
+    private int? _idAlmacen;
+    private int? _idProducto;
+    private string? _tipo;
+    private DateTime? _desde;
+    private DateTime? _hasta;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var cat = await Catalogos.GetAsync();
+            _almacenes = cat.Almacenes;
+            _productos = cat.Productos;
+        }
+        catch (ApiException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task<TableData<MovimientoInventarioDto>> CargarAsync(TableState state, CancellationToken token)
+    {
+        try
+        {
+            var query = new List<string>
+            {
+                $"page={state.Page + 1}",
+                $"pageSize={state.PageSize}"
+            };
+
+            if (_idAlmacen.HasValue) query.Add($"idAlmacen={_idAlmacen.Value}");
+            if (_idProducto.HasValue) query.Add($"idProducto={_idProducto.Value}");
+            if (!string.IsNullOrWhiteSpace(_tipo)) query.Add($"tipo={Uri.EscapeDataString(_tipo)}");
+            if (_desde.HasValue) query.Add($"desde={_desde.Value:yyyy-MM-dd}");
+            if (_hasta.HasValue) query.Add($"hasta={_hasta.Value:yyyy-MM-dd}");
+
+            var data = await Api.GetAsync<PagedResult<MovimientoInventarioDto>>(
+                "api/inventario/movimientos?" + string.Join("&", query));
+
+            return new TableData<MovimientoInventarioDto>
+            {
+                Items = data?.Items ?? new List<MovimientoInventarioDto>(),
+                TotalItems = data?.Total ?? 0
+            };
+        }
+        catch (ApiException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+            return new TableData<MovimientoInventarioDto> { Items = new List<MovimientoInventarioDto>(), TotalItems = 0 };
+        }
+    }
+
+    private Task BuscarAsync() => _tabla == null ? Task.CompletedTask : _tabla.ReloadServerData();
+
+    private async Task LimpiarAsync()
+    {
+        _idAlmacen = null;
+        _idProducto = null;
+        _tipo = null;
+        _desde = null;
+        _hasta = null;
+        await BuscarAsync();
+    }
+}

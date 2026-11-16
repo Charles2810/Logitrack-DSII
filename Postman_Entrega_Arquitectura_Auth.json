@@ -1,0 +1,263 @@
+{
+  "info": {
+    "_postman_id": "b3f5c7e1-8822-491a-9a99-91a133d1b8e4",
+    "name": "LogiTrack Solutions - Entrega Arquitectura y Autenticación",
+    "description": "Colección de pruebas para la consigna de Desarrollo de Sistemas II (UPDS).\nPruebas automatizadas de Arquitectura Multicapa, Cadena Segura y Autenticación del Servidor (Registro, Login, Me y Validaciones de Error).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5163"
+    },
+    {
+      "key": "correoPrueba",
+      "value": "usuario.estudiante@logitrack.test"
+    },
+    {
+      "key": "passwordPrueba",
+      "value": "Seguridad2026*"
+    },
+    {
+      "key": "tokenSesion",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "01 Registro de Usuario Nuevo (Exitoso)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code es 201 Created', function () {",
+              "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+              "});",
+              "",
+              "const data = pm.response.json();",
+              "pm.test('Respuesta contiene token JWT y datos de usuario', function () {",
+              "    pm.expect(data).to.have.property('token');",
+              "    pm.expect(data).to.have.property('correo');",
+              "    pm.expect(data).to.have.property('nombreCompleto');",
+              "    pm.expect(data.token.length).to.be.above(50);",
+              "});",
+              "",
+              "if (data.token) {",
+              "    pm.collectionVariables.set('tokenSesion', data.token);",
+              "    console.log('Token guardado en variable tokenSesion');",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nombreCompleto\": \"Carlos Estudiante UPDS\",\n  \"correo\": \"{{correoPrueba}}\",\n  \"password\": \"{{passwordPrueba}}\",\n  \"confirmarPassword\": \"{{passwordPrueba}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/registro",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "registro"]
+        },
+        "description": "Registra un nuevo usuario en la base de datos aplicando encriptación BCrypt y retorna el JWT inicial."
+      }
+    },
+    {
+      "name": "02 Login con Usuario Registrado (Exitoso)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code es 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const data = pm.response.json();",
+              "pm.test('Login exitoso y retorno de Token JWT', function () {",
+              "    pm.expect(data).to.have.property('token');",
+              "    pm.expect(data.correo).to.eql(pm.collectionVariables.get('correoPrueba'));",
+              "});",
+              "",
+              "if (data.token) {",
+              "    pm.collectionVariables.set('tokenSesion', data.token);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"correo\": \"{{correoPrueba}}\",\n  \"password\": \"{{passwordPrueba}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "login"]
+        },
+        "description": "Verifica credenciales con BCrypt y genera un nuevo token de sesión JWT Bearer."
+      }
+    },
+    {
+      "name": "03 Consultar Perfil Autenticado (Me)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code es 200 OK - Acceso Autorizado', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const data = pm.response.json();",
+              "pm.test('Datos de sesión obtenidos correctamente', function () {",
+              "    pm.expect(data).to.have.property('idUsuario');",
+              "    pm.expect(data).to.have.property('rol');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{tokenSesion}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/me",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "me"]
+        },
+        "description": "Accede a un endpoint protegido mediante el esquema de autorización Bearer Token."
+      }
+    },
+    {
+      "name": "04 Login Fallido - Contraseña Incorrecta",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code es 401 Unauthorized', function () {",
+              "    pm.response.to.have.status(401);",
+              "});",
+              "",
+              "const data = pm.response.json();",
+              "pm.test('Mensaje de error controlado', function () {",
+              "    pm.expect(data).to.have.property('mensaje');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"correo\": \"{{correoPrueba}}\",\n  \"password\": \"ContrasenaInvalida999*\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "login"]
+        },
+        "description": "Comprueba el rechazo seguro ante credenciales inválidas."
+      }
+    },
+    {
+      "name": "05 Registro Fallido - Correo Duplicado",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code es 400 Bad Request', function () {",
+              "    pm.response.to.have.status(400);",
+              "});",
+              "",
+              "const data = pm.response.json();",
+              "pm.test('Rechazo por regla de negocio (correo duplicado)', function () {",
+              "    pm.expect(data.mensaje).to.include('ya se encuentra registrado');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nombreCompleto\": \"Intento Duplicado\",\n  \"correo\": \"{{correoPrueba}}\",\n  \"password\": \"{{passwordPrueba}}\",\n  \"confirmarPassword\": \"{{passwordPrueba}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/registro",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "registro"]
+        },
+        "description": "Comprueba la validación del Repositorio impidiendo registrar dos veces el mismo correo electrónico."
+      }
+    }
+  ]
+}

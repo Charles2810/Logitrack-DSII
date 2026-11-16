@@ -1,0 +1,339 @@
+@using System.ComponentModel.DataAnnotations
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-weight:700;">
+            @(Edicion ? "Editar guía de envío" : "Nueva guía de envío")
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (_cargando)
+        {
+            <div class="d-flex justify-center py-8"><MudProgressCircular Indeterminate="true" /></div>
+        }
+        else
+        {
+            @if (!string.IsNullOrWhiteSpace(_error))
+            {
+                <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mb-4">@_error</MudAlert>
+            }
+
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="int" @bind-Value="_idCliente" Label="Cliente" Variant="Variant.Outlined"
+                               AnchorOrigin="Origin.BottomCenter" Required="true">
+                        @foreach (var c in _cat.Clientes)
+                        {
+                            <MudSelectItem T="int" Value="@c.IdCliente">@c.RazonSocial</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="int" @bind-Value="_idAlmacen" Label="Almacén de origen" Variant="Variant.Outlined"
+                               AnchorOrigin="Origin.BottomCenter" Required="true">
+                        @foreach (var a in _cat.Almacenes)
+                        {
+                            <MudSelectItem T="int" Value="@a.IdAlmacen">@a.Nombre</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="int" @bind-Value="_idTipoCarga" Label="Tipo de carga" Variant="Variant.Outlined"
+                               AnchorOrigin="Origin.BottomCenter" Required="true">
+                        @foreach (var t in _cat.TiposCarga)
+                        {
+                            <MudSelectItem T="int" Value="@t.IdTipoCarga">@t.Nombre</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="int?" @bind-Value="_idHoja" Label="Hoja de ruta (opcional)" Variant="Variant.Outlined"
+                               AnchorOrigin="Origin.BottomCenter" Clearable="true" Disabled="Edicion"
+                               HelperText="@(Edicion ? "La asignación se gestiona desde el detalle de la guía." : null)">
+                        @foreach (var h in _hojas)
+                        {
+                            <MudSelectItem T="int?" Value="@h.IdHojaRuta">
+                                #@h.IdHojaRuta · @h.VehiculoPlaca · @h.Conductor
+                            </MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_destinatario" Label="Destinatario" Variant="Variant.Outlined"
+                                  MaxLength="120" Required="true" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_direccion" Label="Dirección de destino" Variant="Variant.Outlined"
+                                  MaxLength="200" Required="true" />
+                </MudItem>
+                <MudItem xs="6" sm="3">
+                    <MudNumericField T="decimal" @bind-Value="_peso" Label="Peso (kg)" Variant="Variant.Outlined"
+                                     Min="0.01m" Format="N2" Disabled="_autoCalcular" />
+                </MudItem>
+                <MudItem xs="6" sm="3">
+                    <MudNumericField T="decimal" @bind-Value="_volumen" Label="Volumen (m³)" Variant="Variant.Outlined"
+                                     Min="0.001m" Format="N3" Disabled="_autoCalcular" />
+                </MudItem>
+                <MudItem xs="12" sm="6" Class="d-flex align-center">
+                    <MudSwitch @bind-Value="_autoCalcular" Color="Color.Primary"
+                               Label="Calcular peso y volumen desde el detalle" />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <div class="d-flex justify-space-between align-center mt-2 mb-2">
+                        <MudText Typo="Typo.subtitle1" Style="font-weight:600;">Detalle de productos</MudText>
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.Add" OnClick="AgregarLinea">Agregar producto</MudButton>
+                    </div>
+
+                    @if (_lineas.Count == 0)
+                    {
+                        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">
+                            Agregue al menos un producto al detalle de la guía.
+                        </MudAlert>
+                    }
+                    else
+                    {
+                        @foreach (var linea in _lineas)
+                        {
+                            <div class="d-flex gap-2 align-center mb-2">
+                                <MudSelect T="int" @bind-Value="linea.IdProducto" Label="Producto" Variant="Variant.Outlined"
+                                           Dense="true" Class="flex-grow-1" AnchorOrigin="Origin.BottomCenter">
+                                    @foreach (var p in _cat.Productos)
+                                    {
+                                        <MudSelectItem T="int" Value="@p.IdProducto">@p.Sku · @p.Nombre</MudSelectItem>
+                                    }
+                                </MudSelect>
+                                <MudNumericField T="int" @bind-Value="linea.Cantidad" Label="Cantidad"
+                                                 Variant="Variant.Outlined" Min="1" Style="max-width:130px;" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
+                                               OnClick="@(() => QuitarLinea(linea))" />
+                            </div>
+                        }
+                    }
+                </MudItem>
+            </MudGrid>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar" Variant="Variant.Text">Cancelar</MudButton>
+        <MudButton OnClick="GuardarAsync" Variant="Variant.Filled" Color="Color.Primary" Disabled="_guardando || _cargando">
+            @if (_guardando)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" Color="Color.Inherit" />
+            }
+            @(Edicion ? "Guardar cambios" : "Registrar guía")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public GuiaDto? Guia { get; set; }
+    [Parameter] public bool Edicion { get; set; }
+
+    [Inject] private ApiClient Api { get; set; } = default!;
+    [Inject] private CatalogosService Catalogos { get; set; } = default!;
+    [Inject] private ISnackbar Snackbar { get; set; } = default!;
+
+    private CatalogosDto _cat = new();
+    private List<HojaRutaDto> _hojas = new();
+    private readonly List<LineaDetalle> _lineas = new();
+
+    private int _idCliente;
+    private int _idAlmacen;
+    private int _idTipoCarga;
+    private int? _idHoja;
+    private string _destinatario = string.Empty;
+    private string _direccion = string.Empty;
+    private decimal _peso;
+    private decimal _volumen;
+    private bool _autoCalcular = true;
+
+    private bool _cargando = true;
+    private bool _guardando;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _cat = await Catalogos.GetAsync();
+
+            if (!Edicion)
+            {
+                var hojas = await Api.GetAsync<PagedResult<HojaRutaDto>>("api/hojas-ruta?estado=Pendiente&pageSize=100");
+                _hojas = hojas?.Items ?? new List<HojaRutaDto>();
+            }
+
+            if (Edicion && Guia != null)
+            {
+                _idCliente = Guia.IdCliente;
+                _idAlmacen = Guia.IdAlmacenOrigen;
+                _idTipoCarga = Guia.IdTipoCarga;
+                _idHoja = Guia.IdHojaRuta;
+                _destinatario = Guia.Destinatario;
+                _direccion = Guia.DireccionDestino;
+                _peso = Guia.PesoKg;
+                _volumen = Guia.VolumenM3;
+                _autoCalcular = false;
+
+                var detalle = Guia.Detalles ?? new List<DetalleGuiaDto>();
+                foreach (var d in detalle)
+                {
+                    _lineas.Add(new LineaDetalle { IdProducto = d.IdProducto, Cantidad = d.Cantidad });
+                }
+            }
+            else
+            {
+                _idCliente = _cat.Clientes.FirstOrDefault()?.IdCliente ?? 0;
+                _idAlmacen = _cat.Almacenes.FirstOrDefault(a => a.Tipo == "Almacén")?.IdAlmacen
+                             ?? _cat.Almacenes.FirstOrDefault()?.IdAlmacen ?? 0;
+                _idTipoCarga = _cat.TiposCarga.FirstOrDefault()?.IdTipoCarga ?? 0;
+                AgregarLinea();
+            }
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    private void AgregarLinea()
+    {
+        _lineas.Add(new LineaDetalle
+        {
+            IdProducto = _cat.Productos.FirstOrDefault()?.IdProducto ?? 0,
+            Cantidad = 1
+        });
+    }
+
+    private void QuitarLinea(LineaDetalle linea) => _lineas.Remove(linea);
+
+    private async Task GuardarAsync()
+    {
+        _error = null;
+
+        if (_idCliente <= 0 || _idAlmacen <= 0 || _idTipoCarga <= 0)
+        {
+            _error = "Seleccione cliente, almacén de origen y tipo de carga.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_destinatario) || string.IsNullOrWhiteSpace(_direccion))
+        {
+            _error = "El destinatario y la dirección de destino son obligatorios.";
+            return;
+        }
+
+        var detalles = _lineas
+            .Where(l => l.IdProducto > 0 && l.Cantidad > 0)
+            .Select(l => new DetalleGuiaRequest { IdProducto = l.IdProducto, Cantidad = l.Cantidad })
+            .ToList();
+
+        if (detalles.Count == 0)
+        {
+            _error = "Debe agregar al menos un producto al detalle.";
+            return;
+        }
+
+        if (detalles.Select(d => d.IdProducto).Distinct().Count() != detalles.Count)
+        {
+            _error = "No puede repetir el mismo producto en el detalle.";
+            return;
+        }
+
+        var peso = _peso;
+        var volumen = _volumen;
+        if (_autoCalcular)
+        {
+            peso = 0;
+            volumen = 0;
+            foreach (var detalle in detalles)
+            {
+                var producto = _cat.Productos.FirstOrDefault(p => p.IdProducto == detalle.IdProducto);
+                if (producto == null)
+                {
+                    continue;
+                }
+                peso += producto.PesoUnitarioKg * detalle.Cantidad;
+                volumen += producto.VolumenUnitarioM3 * detalle.Cantidad;
+            }
+
+            peso = Math.Round(peso, 2);
+            volumen = Math.Round(volumen, 3);
+        }
+
+        if (peso <= 0 || volumen <= 0)
+        {
+            _error = "El peso y el volumen deben ser mayores a cero.";
+            return;
+        }
+
+        _guardando = true;
+
+        try
+        {
+            if (Edicion && Guia != null)
+            {
+                await Api.PutAsync<GuiaDto>($"api/guias/{Guia.IdGuia}", new ActualizarGuiaRequest
+                {
+                    IdCliente = _idCliente,
+                    IdAlmacenOrigen = _idAlmacen,
+                    IdTipoCarga = _idTipoCarga,
+                    Destinatario = _destinatario.Trim(),
+                    DireccionDestino = _direccion.Trim(),
+                    PesoKg = peso,
+                    VolumenM3 = volumen,
+                    Detalles = detalles
+                });
+
+                Snackbar.Add("Guía actualizada correctamente.", Severity.Success);
+            }
+            else
+            {
+                await Api.PostAsync<GuiaDto>("api/guias", new CrearGuiaRequest
+                {
+                    IdCliente = _idCliente,
+                    IdAlmacenOrigen = _idAlmacen,
+                    IdTipoCarga = _idTipoCarga,
+                    IdHojaRuta = _idHoja,
+                    Destinatario = _destinatario.Trim(),
+                    DireccionDestino = _direccion.Trim(),
+                    PesoKg = peso,
+                    VolumenM3 = volumen,
+                    Detalles = detalles
+                });
+
+                Catalogos.Invalidar();
+                Snackbar.Add("Guía registrada correctamente.", Severity.Success);
+            }
+
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _error = "No se pudo guardar la guía: " + ex.Message;
+        }
+        finally
+        {
+            _guardando = false;
+        }
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+
+    private class LineaDetalle
+    {
+        public int IdProducto { get; set; }
+        public int Cantidad { get; set; } = 1;
+    }
+}

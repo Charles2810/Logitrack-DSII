@@ -1,0 +1,165 @@
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-weight:700;">
+            @(Edicion ? "Editar usuario" : "Nuevo usuario")
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (_cargando)
+        {
+            <div class="d-flex justify-center py-6"><MudProgressCircular Indeterminate="true" /></div>
+        }
+        else
+        {
+            @if (!string.IsNullOrWhiteSpace(_error))
+            {
+                <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mb-4">@_error</MudAlert>
+            }
+
+            <MudTextField @bind-Value="_nombreCompleto" Label="Nombre completo" Variant="Variant.Outlined"
+                          MaxLength="120" Required="true" Class="mb-3" />
+            <MudTextField @bind-Value="_correo" Label="Correo electrónico" Variant="Variant.Outlined"
+                          InputType="InputType.Email" MaxLength="120" Required="true" Class="mb-3" />
+            <MudSelect T="int" @bind-Value="_idRol" Label="Rol" Variant="Variant.Outlined"
+                       AnchorOrigin="Origin.BottomCenter" Required="true" Class="mb-3">
+                @foreach (var rol in _roles)
+                {
+                    <MudSelectItem T="int" Value="@rol.IdRol">@rol.Nombre</MudSelectItem>
+                }
+            </MudSelect>
+
+            @if (!Edicion)
+            {
+                <MudTextField @bind-Value="_password" Label="Contraseña inicial" Variant="Variant.Outlined"
+                              InputType="@(_verPassword ? InputType.Text : InputType.Password)"
+                              Adornment="Adornment.End"
+                              AdornmentIcon="@(_verPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                              OnAdornmentClick="@(() => _verPassword = !_verPassword)"
+                              HelperText="Mínimo 8 caracteres." Required="true" Class="mb-3" />
+            }
+
+            <MudSwitch @bind-Value="_activo" Color="Color.Primary" Label="Usuario activo" />
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar" Variant="Variant.Text">Cancelar</MudButton>
+        <MudButton OnClick="GuardarAsync" Variant="Variant.Filled" Color="Color.Primary"
+                   Disabled="_guardando || _cargando">
+            @if (_guardando)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" Color="Color.Inherit" />
+            }
+            @(Edicion ? "Guardar cambios" : "Crear usuario")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public UsuarioDto? Usuario { get; set; }
+    [Parameter] public bool Edicion { get; set; }
+
+    [Inject] private ApiClient Api { get; set; } = default!;
+    [Inject] private CatalogosService Catalogos { get; set; } = default!;
+    [Inject] private ISnackbar Snackbar { get; set; } = default!;
+
+    private List<RolDto> _roles = new();
+    private int _idRol;
+    private string _nombreCompleto = string.Empty;
+    private string _correo = string.Empty;
+    private string _password = string.Empty;
+    private bool _activo = true;
+    private bool _verPassword;
+    private bool _cargando = true;
+    private bool _guardando;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var cat = await Catalogos.GetAsync();
+            _roles = cat.Roles;
+
+            if (Edicion && Usuario != null)
+            {
+                _idRol = Usuario.IdRol;
+                _nombreCompleto = Usuario.NombreCompleto;
+                _correo = Usuario.Correo;
+                _activo = Usuario.Activo;
+            }
+            else
+            {
+                _idRol = _roles.FirstOrDefault()?.IdRol ?? 0;
+            }
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    private async Task GuardarAsync()
+    {
+        if (_idRol <= 0 || string.IsNullOrWhiteSpace(_nombreCompleto) || string.IsNullOrWhiteSpace(_correo))
+        {
+            _error = "Complete el nombre, el correo y el rol.";
+            return;
+        }
+
+        if (!Edicion && string.IsNullOrWhiteSpace(_password))
+        {
+            _error = "Defina una contraseña inicial.";
+            return;
+        }
+
+        _guardando = true;
+        _error = null;
+
+        try
+        {
+            if (Edicion && Usuario != null)
+            {
+                await Api.PutAsync<UsuarioDto>($"api/usuarios/{Usuario.IdUsuario}", new ActualizarUsuarioRequest
+                {
+                    IdRol = _idRol,
+                    NombreCompleto = _nombreCompleto.Trim(),
+                    Correo = _correo.Trim(),
+                    Activo = _activo
+                });
+
+                Snackbar.Add("Usuario actualizado correctamente.", Severity.Success);
+            }
+            else
+            {
+                await Api.PostAsync<UsuarioDto>("api/usuarios", new CrearUsuarioRequest
+                {
+                    IdRol = _idRol,
+                    NombreCompleto = _nombreCompleto.Trim(),
+                    Correo = _correo.Trim(),
+                    Password = _password,
+                    Activo = _activo
+                });
+
+                Snackbar.Add("Usuario creado correctamente.", Severity.Success);
+            }
+
+            Catalogos.Invalidar();
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _guardando = false;
+        }
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+}

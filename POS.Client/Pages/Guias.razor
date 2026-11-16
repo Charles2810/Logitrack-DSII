@@ -1,0 +1,266 @@
+@page "/guias"
+@attribute [Authorize(Roles = "Administrador del Sistema,Administrador Logístico,Centro de Control/Supervisor")]
+@inject ApiClient Api
+@inject CatalogosService Catalogos
+@inject IDialogService DialogService
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>LogiTrack Solutions · Guías de envío</PageTitle>
+
+<div class="d-flex justify-space-between align-center flex-wrap gap-3 mb-4">
+    <div>
+        <MudText Typo="Typo.h4" Style="font-weight:800;">Guías de envío</MudText>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">
+            Registro, seguimiento y asignación de guías a hojas de ruta.
+        </MudText>
+    </div>
+    <AuthorizeView Roles="@Roles.AdministradorLogistico">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="NuevaGuiaAsync">Nueva guía</MudButton>
+    </AuthorizeView>
+</div>
+
+<MudPaper Elevation="2" Class="pa-4 mb-4">
+    <MudGrid Spacing="2">
+        <MudItem xs="12" md="4">
+            <MudTextField @bind-Value="_buscar" Label="Buscar código, destinatario o cliente"
+                          Variant="Variant.Outlined" Immediate="true"
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                          OnAdornmentClick="@(_ => BuscarAsync())" DebounceInterval="400"
+                          OnDebounceIntervalElapsed="@(_ => BuscarAsync())" />
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudSelect T="int?" @bind-Value="_idHito" @bind-Value:after="BuscarAsync" Label="Estado / hito"
+                       Variant="Variant.Outlined" Dense="true" Clearable="true" AnchorOrigin="Origin.BottomCenter">
+                @foreach (var h in _cat.Hitos)
+                {
+                    <MudSelectItem T="int?" Value="@h.IdHito">@h.Nombre</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudSelect T="int?" @bind-Value="_idCliente" @bind-Value:after="BuscarAsync" Label="Cliente"
+                       Variant="Variant.Outlined" Dense="true" Clearable="true" AnchorOrigin="Origin.BottomCenter">
+                @foreach (var c in _cat.Clientes)
+                {
+                    <MudSelectItem T="int?" Value="@c.IdCliente">@c.RazonSocial</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="2" Class="d-flex gap-2">
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="BuscarAsync"
+                       StartIcon="@Icons.Material.Filled.FilterAlt" FullWidth="true">Filtrar</MudButton>
+            <MudIconButton Icon="@Icons.Material.Filled.Refresh" OnClick="LimpiarAsync" title="Limpiar filtros" />
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+<MudPaper Elevation="2">
+    <MudTable @ref="_tabla" ServerData="CargarAsync" Dense="true" Hover="true" Striped="true" Breakpoint="Breakpoint.Sm">
+        <HeaderContent>
+            <MudTh>Código</MudTh>
+            <MudTh>Cliente</MudTh>
+            <MudTh>Destinatario / destino</MudTh>
+            <MudTh>Estado actual</MudTh>
+            <MudTh>Hoja de ruta</MudTh>
+            <MudTh>Registro</MudTh>
+            <MudTh align="Right">Acciones</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd><b>@context.CodigoGuia</b></MudTd>
+            <MudTd>@context.Cliente</MudTd>
+            <MudTd>
+                <div>@context.Destinatario</div>
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">@context.DireccionDestino</MudText>
+            </MudTd>
+            <MudTd>
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="@ColorHito(context.HitoActual)">
+                    @context.HitoActual
+                </MudChip>
+                @if (context.TotalIncidencias > 0)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Warning" Icon="@Icons.Material.Filled.ReportProblem">
+                        @context.TotalIncidencias
+                    </MudChip>
+                }
+            </MudTd>
+            <MudTd>
+                @if (context.IdHojaRuta.HasValue)
+                {
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Info"
+                             Href="@($"/hojas-ruta/{context.IdHojaRuta}")">
+                        #@context.IdHojaRuta · @context.EstadoHojaRuta
+                    </MudChip>
+                }
+                else
+                {
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">Sin asignar</MudText>
+                }
+            </MudTd>
+            <MudTd>@context.FechaRegistro.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</MudTd>
+            <MudTd align="Right">
+                <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Color="Color.Primary"
+                               Href="@($"/guias/{context.IdGuia}")" title="Ver detalle" />
+                <AuthorizeView Roles="@Roles.AdministradorLogistico" Context="adminLog">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Default"
+                                   OnClick="@(() => EditarAsync(context))" title="Editar" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Route" Size="Size.Small" Color="Color.Secondary"
+                                   OnClick="@(() => AsignarAsync(context))" title="Asignar hoja de ruta" />
+                </AuthorizeView>
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Typo="Typo.body2" Class="mud-text-secondary py-4">No se encontraron guías con los filtros aplicados.</MudText>
+        </NoRecordsContent>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new[] { 10, 20, 50, 100 }" RowsPerPageString="Filas por página" />
+        </PagerContent>
+    </MudTable>
+</MudPaper>
+
+@code {
+    private readonly CatalogosDto _cat = new();
+    private MudTable<GuiaDto> _tabla = default!;
+    private string? _buscar;
+    private int? _idHito;
+    private int? _idCliente;
+
+    [SupplyParameterFromQuery(Name = "nueva")]
+    public bool Nueva { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var cat = await Catalogos.GetAsync();
+            _cat.Hitos = cat.Hitos;
+            _cat.Clientes = cat.Clientes;
+        }
+        catch (ApiException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && Nueva)
+        {
+            await NuevaGuiaAsync();
+        }
+    }
+
+    private async Task<TableData<GuiaDto>> CargarAsync(TableState state, CancellationToken token)
+    {
+        try
+        {
+            var url = $"api/guias?page={state.Page + 1}&pageSize={state.PageSize}";
+
+            if (!string.IsNullOrWhiteSpace(_buscar))
+            {
+                url += $"&buscar={Uri.EscapeDataString(_buscar.Trim())}";
+            }
+            if (_idHito.HasValue)
+            {
+                url += $"&idHito={_idHito.Value}";
+            }
+            if (_idCliente.HasValue)
+            {
+                url += $"&idCliente={_idCliente.Value}";
+            }
+
+            var data = await Api.GetAsync<PagedResult<GuiaDto>>(url);
+            return new TableData<GuiaDto>
+            {
+                Items = data?.Items ?? new List<GuiaDto>(),
+                TotalItems = data?.Total ?? 0
+            };
+        }
+        catch (ApiException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+            return new TableData<GuiaDto> { Items = new List<GuiaDto>(), TotalItems = 0 };
+        }
+    }
+
+    private Task BuscarAsync()
+    {
+        if (_tabla != null)
+        {
+            return _tabla.ReloadServerData();
+        }
+        return Task.CompletedTask;
+    }
+
+    private Task OnFiltroChanged(object? _) => Task.CompletedTask;
+
+    private async Task LimpiarAsync()
+    {
+        _buscar = null;
+        _idHito = null;
+        _idCliente = null;
+        await BuscarAsync();
+    }
+
+    private async Task NuevaGuiaAsync()
+    {
+        var parameters = new DialogParameters { { nameof(GuiaDialog.Edicion), false } };
+        var dialog = await DialogService.ShowAsync<GuiaDialog>("Nueva guía", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true });
+
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await BuscarAsync();
+        }
+    }
+
+    private async Task EditarAsync(GuiaDto guia)
+    {
+        var detalle = await Api.GetAsync<GuiaDto>($"api/guias/{guia.IdGuia}");
+        if (detalle == null)
+        {
+            return;
+        }
+
+        var parameters = new DialogParameters
+        {
+            { nameof(GuiaDialog.Guia), detalle },
+            { nameof(GuiaDialog.Edicion), true }
+        };
+
+        var dialog = await DialogService.ShowAsync<GuiaDialog>("Editar guía", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true });
+
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await BuscarAsync();
+        }
+    }
+
+    private async Task AsignarAsync(GuiaDto guia)
+    {
+        var detalle = await Api.GetAsync<GuiaDto>($"api/guias/{guia.IdGuia}");
+        var parameters = new DialogParameters { { nameof(AsignarHojaDialog.Guia), detalle ?? guia } };
+
+        var dialog = await DialogService.ShowAsync<AsignarHojaDialog>("Asignar hoja de ruta", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true });
+
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await BuscarAsync();
+        }
+    }
+
+    private static Color ColorHito(string hito) => hito switch
+    {
+        Hitos.Entregado => Color.Success,
+        Hitos.EnTransito or Hitos.EnRepartoFinal => Color.Info,
+        Hitos.EnCentroDistribucion or Hitos.SalidaAlmacen => Color.Warning,
+        Hitos.Registrada => Color.Default,
+        _ => Color.Primary
+    };
+}

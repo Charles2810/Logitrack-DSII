@@ -1,0 +1,40 @@
+## .gitignore para proyectos .NET / Visual Studio
+
+# Carpetas de compilación
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# Visual Studio
+.vs/
+*.user
+*.userosscache
+*.sln.docstates
+*.suo
+
+# Archivos de caché y temporales
+*.tmp
+*.temp
+*.swp
+*~
+Thumbs.db
+[Ee]xpress/
+
+# NuGet
+*.nuget.props
+*.nuget.targets
+project.lock.json
+project.assets.json
+
+# Respaldo de BD temporales
+*.mdf
+*.ldf
+
+# Postman local workspace files
+.postman/
+postman/
+
+# Evitar subir secretos en caso de crearse archivos locales
+secrets.json
+appsettings.*.local.json

@@ -1,0 +1,410 @@
+@page "/guias/{Id:int}"
+@attribute [Authorize(Roles = "Administrador del Sistema,Administrador Logístico,Conductor/Operador,Personal de Almacén,Centro de Control/Supervisor")]
+@using System.Net
+@inject ApiClient Api
+@inject IDialogService DialogService
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>LogiTrack Solutions · Guía</PageTitle>
+
+<MudButton Href="/guias" Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.ArrowBack"
+           Class="mb-2">Volver a guías</MudButton>
+
+@if (_cargando)
+{
+    <div class="d-flex justify-center my-10"><MudProgressCircular Indeterminate="true" /></div>
+}
+else if (_guia == null)
+{
+    <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">@_error</MudAlert>
+}
+else
+{
+    <div class="d-flex justify-space-between align-center flex-wrap gap-3 mb-4">
+        <div>
+            <div class="d-flex align-center gap-3 flex-wrap">
+                <MudText Typo="Typo.h4" Style="font-weight:800;">@_guia.CodigoGuia</MudText>
+                <MudChip T="string" Color="@ColorHito(_guia.HitoActual)" Variant="Variant.Filled" Size="Size.Medium">
+                    @_guia.HitoActual
+                </MudChip>
+                @if (_guia.TotalIncidencias > 0)
+                {
+                    <MudChip T="string" Color="Color.Warning" Icon="@Icons.Material.Filled.ReportProblem" Size="Size.Medium">
+                        @_guia.TotalIncidencias incidencia(s)
+                    </MudChip>
+                }
+            </div>
+            <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                @_guia.Cliente · registrada el @_guia.FechaRegistro.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+            </MudText>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.TravelExplore"
+                       Href="@($"/rastreo?codigo={_guia.CodigoGuia}")">Rastreo</MudButton>
+
+            <AuthorizeView Roles="@Roles.AdministradorLogistico" Context="adminLog">
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Edit"
+                           OnClick="EditarAsync">Editar</MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Info" StartIcon="@Icons.Material.Filled.Route"
+                           OnClick="AsignarAsync">Asignar hoja</MudButton>
+            </AuthorizeView>
+
+            <AuthorizeView Roles="@($"{Roles.Conductor},{Roles.PersonalAlmacen}")" Context="operador">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AddLocationAlt"
+                           OnClick="CheckpointAsync" Disabled="@(_guia.HitoActual == Hitos.Entregado)">
+                    Registrar checkpoint
+                </MudButton>
+            </AuthorizeView>
+
+            <AuthorizeView Roles="@($"{Roles.Conductor},{Roles.CentroControl}")" Context="inc">
+                <MudButton Variant="Variant.Filled" Color="Color.Warning" StartIcon="@Icons.Material.Filled.ReportProblem"
+                           OnClick="IncidenciaAsync" Disabled="@(_guia.HitoActual == Hitos.Entregado)">
+                    Reportar incidencia
+                </MudButton>
+            </AuthorizeView>
+
+            <AuthorizeView Roles="@Roles.Conductor" Context="cond">
+                <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.CheckCircle"
+                           OnClick="EntregaAsync" Disabled="@(_guia.HitoActual != Hitos.EnRepartoFinal || _entrega != null)">
+                    Confirmar entrega
+                </MudButton>
+            </AuthorizeView>
+        </div>
+    </div>
+
+    <MudGrid Spacing="3">
+        <MudItem xs="12" lg="7">
+            <MudPaper Elevation="2" Class="pa-5 mb-4">
+                <MudText Typo="Typo.h6" Style="font-weight:700;" Class="mb-3">Datos del envío</MudText>
+                <MudGrid>
+                    <MudItem xs="12" sm="6">
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">Cliente</MudText>
+                        <MudText Typo="Typo.body1">@_guia.Cliente</MudText>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">Almacén de origen</MudText>
+                        <MudText Typo="Typo.body1">@_guia.AlmacenOrigen</MudText>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">Destinatario</MudText>
+                        <MudText Typo="Typo.body1">@_guia.Destinatario</MudText>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">Dirección de destino</MudText>
+                        <MudText Typo="Typo.body1">@_guia.DireccionDestino</MudText>
+                    </MudItem>
+                    <MudItem xs="6" sm="3">
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">Tipo de carga</MudText>
+                        <MudText Typo="Typo.body1">@_guia.TipoCarga</MudText>
+                    </MudItem>
+                    <MudItem xs="6" sm="3">
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">Peso</MudText>
+                        <MudText Typo="Typo.body1">@_guia.PesoKg.ToString("N2") kg</MudText>
+                    </MudItem>
+                    <MudItem xs="6" sm="3">
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">Volumen</MudText>
+                        <MudText Typo="Typo.body1">@_guia.VolumenM3.ToString("N3") m³</MudText>
+                    </MudItem>
+                    <MudItem xs="6" sm="3">
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">Registrado por</MudText>
+                        <MudText Typo="Typo.body1">@_guia.UsuarioRegistro</MudText>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">Hoja de ruta</MudText>
+                        @if (_guia.IdHojaRuta.HasValue)
+                        {
+                            <MudButton Href="@($"/hojas-ruta/{_guia.IdHojaRuta}")" Variant="Variant.Text"
+                                       Color="Color.Info" Size="Size.Small" Class="px-0">
+                                #@_guia.IdHojaRuta · @_guia.EstadoHojaRuta
+                            </MudButton>
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.body1">Sin asignar</MudText>
+                        }
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+
+            <MudPaper Elevation="2" Class="pa-5 mb-4">
+                <MudText Typo="Typo.h6" Style="font-weight:700;" Class="mb-3">Detalle de productos</MudText>
+                @if (_guia.Detalles == null || _guia.Detalles.Count == 0)
+                {
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary">Sin detalle registrado.</MudText>
+                }
+                else
+                {
+                    <MudSimpleTable Dense="true" Hover="true" Striped="true">
+                        <thead>
+                            <tr><th>SKU</th><th>Producto</th><th style="text-align:right;">Cantidad</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var d in _guia.Detalles)
+                            {
+                                <tr>
+                                    <td>@d.Sku</td>
+                                    <td>@d.Producto</td>
+                                    <td style="text-align:right;">@d.Cantidad</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                }
+            </MudPaper>
+
+            <MudPaper Elevation="2" Class="pa-5">
+                <div class="d-flex justify-space-between align-center mb-3">
+                    <MudText Typo="Typo.h6" Style="font-weight:700;">Incidencias reportadas</MudText>
+                    <MudChip T="string" Size="Size.Small" Color="@(_incidencias.Count > 0 ? Color.Warning : Color.Default)">
+                        @_incidencias.Count
+                    </MudChip>
+                </div>
+
+                @if (_incidencias.Count == 0)
+                {
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary">No hay incidencias registradas para esta guía.</MudText>
+                }
+                else
+                {
+                    @foreach (var inc in _incidencias)
+                    {
+                        <MudPaper Outlined="true" Class="pa-3 mb-3">
+                            <div class="d-flex justify-space-between align-start flex-wrap gap-2">
+                                <div>
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Filled">
+                                        @inc.TipoIncidencia
+                                    </MudChip>
+                                    <MudText Typo="Typo.body2" Class="mt-1">@inc.Descripcion</MudText>
+                                    <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                        @inc.Usuario · @inc.FechaHora.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                                    </MudText>
+                                </div>
+                                @if (!string.IsNullOrWhiteSpace(inc.RutaFoto))
+                                {
+                                    <MudImage Src="@inc.RutaFoto" Width="90" Height="70" Class="rounded"
+                                              ObjectFit="ObjectFit.Cover" Style="cursor:zoom-in;"
+                                              @onclick="@(() => VerImagen(inc.RutaFoto))" />
+                                }
+                            </div>
+                        </MudPaper>
+                    }
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" lg="5">
+            <MudPaper Elevation="2" Class="pa-5 mb-4">
+                <MudText Typo="Typo.h6" Style="font-weight:700;" Class="mb-3">Línea de tiempo</MudText>
+
+                @if (_checkpoints.Count == 0)
+                {
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary">Aún no se registraron checkpoints.</MudText>
+                }
+                else
+                {
+                    <MudTimeline TimelineAlign="TimelineAlign.Start">
+                        @for (var i = 0; i < _checkpoints.Count; i++)
+                        {
+                            var cp = _checkpoints[i];
+                            var ultimo = i == _checkpoints.Count - 1;
+                            <MudTimelineItem Color="@(ultimo ? Color.Primary : Color.Default)" Elevation="0" Size="Size.Small"
+                                             Variant="Variant.Filled">
+                                <ItemContent>
+                                    <MudText Typo="Typo.subtitle2" Style="font-weight:700;">@cp.Hito</MudText>
+                                    <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                        @cp.FechaHora.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                                        @if (!string.IsNullOrWhiteSpace(cp.Almacen))
+                                        {
+                                            <span> · @cp.Almacen</span>
+                                        }
+                                    </MudText>
+                                    <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                        @cp.Usuario (@cp.RolUsuario)
+                                    </MudText>
+                                </ItemContent>
+                            </MudTimelineItem>
+                        }
+                    </MudTimeline>
+                }
+            </MudPaper>
+
+            <MudPaper Elevation="2" Class="pa-5">
+                <MudText Typo="Typo.h6" Style="font-weight:700;" Class="mb-3">Entrega</MudText>
+                @if (_entrega == null)
+                {
+                    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">
+                        Pendiente de confirmación. La guía debe estar en “En Reparto Final”.
+                    </MudAlert>
+                }
+                else
+                {
+                    <MudText Typo="Typo.body2"><b>Receptor:</b> @(_entrega.NombreReceptor ?? "No registrado")</MudText>
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary mb-3">
+                        @_entrega.Usuario · @_entrega.FechaHora.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                    </MudText>
+                    <div class="d-flex gap-2 flex-wrap">
+                        @if (!string.IsNullOrWhiteSpace(_entrega.RutaFirma))
+                        {
+                            <div>
+                                <MudText Typo="Typo.caption" Class="mud-text-secondary">Firma</MudText>
+                                <MudImage Src="@_entrega.RutaFirma" Width="140" Height="90" Class="rounded"
+                                          ObjectFit="ObjectFit.Contain" Style="cursor:zoom-in;"
+                                          @onclick="@(() => VerImagen(_entrega!.RutaFirma))" />
+                            </div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(_entrega.RutaFoto))
+                        {
+                            <div>
+                                <MudText Typo="Typo.caption" Class="mud-text-secondary">Fotografía</MudText>
+                                <MudImage Src="@_entrega.RutaFoto" Width="140" Height="90" Class="rounded"
+                                          ObjectFit="ObjectFit.Cover" Style="cursor:zoom-in;"
+                                          @onclick="@(() => VerImagen(_entrega!.RutaFoto))" />
+                            </div>
+                        }
+                    </div>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private GuiaDto? _guia;
+    private EntregaDto? _entrega;
+    private List<CheckpointDto> _checkpoints = new();
+    private List<IncidenciaDto> _incidencias = new();
+    private bool _cargando = true;
+    private string _error = string.Empty;
+
+    protected override async Task OnParametersSetAsync() => await CargarAsync();
+
+    private async Task CargarAsync()
+    {
+        _cargando = true;
+        try
+        {
+            _guia = await Api.GetAsync<GuiaDto>($"api/guias/{Id}");
+            if (_guia == null)
+            {
+                _error = "Guía no encontrada.";
+                return;
+            }
+
+            _checkpoints = await Api.GetAsync<List<CheckpointDto>>($"api/guias/{Id}/checkpoints") ?? new();
+            _incidencias = await Api.GetAsync<List<IncidenciaDto>>($"api/guias/{Id}/incidencias") ?? new();
+
+            try
+            {
+                _entrega = await Api.GetAsync<EntregaDto>($"api/guias/{Id}/entrega");
+            }
+            catch (ApiException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+            {
+                _entrega = null;
+            }
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    private async Task EditarAsync()
+    {
+        if (_guia == null) return;
+
+        var parameters = new DialogParameters
+        {
+            { nameof(GuiaDialog.Guia), _guia },
+            { nameof(GuiaDialog.Edicion), true }
+        };
+
+        var dialog = await DialogService.ShowAsync<GuiaDialog>("Editar guía", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true });
+
+        if ((await dialog.Result) is { Canceled: false })
+        {
+            await CargarAsync();
+        }
+    }
+
+    private async Task AsignarAsync()
+    {
+        if (_guia == null) return;
+
+        var parameters = new DialogParameters { { nameof(AsignarHojaDialog.Guia), _guia } };
+        var dialog = await DialogService.ShowAsync<AsignarHojaDialog>("Asignar hoja de ruta", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true });
+
+        if ((await dialog.Result) is { Canceled: false })
+        {
+            await CargarAsync();
+        }
+    }
+
+    private async Task CheckpointAsync()
+    {
+        if (_guia == null) return;
+
+        var parameters = new DialogParameters { { nameof(CheckpointDialog.Guia), _guia } };
+        var dialog = await DialogService.ShowAsync<CheckpointDialog>("Registrar checkpoint", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true });
+
+        if ((await dialog.Result) is { Canceled: false })
+        {
+            await CargarAsync();
+        }
+    }
+
+    private async Task IncidenciaAsync()
+    {
+        if (_guia == null) return;
+
+        var parameters = new DialogParameters { { nameof(IncidenciaDialog.Guia), _guia } };
+        var dialog = await DialogService.ShowAsync<IncidenciaDialog>("Reportar incidencia", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true });
+
+        if ((await dialog.Result) is { Canceled: false })
+        {
+            await CargarAsync();
+        }
+    }
+
+    private async Task EntregaAsync()
+    {
+        if (_guia == null) return;
+
+        var parameters = new DialogParameters { { nameof(EntregaDialog.Guia), _guia } };
+        var dialog = await DialogService.ShowAsync<EntregaDialog>("Confirmar entrega", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true });
+
+        if ((await dialog.Result) is { Canceled: false })
+        {
+            await CargarAsync();
+        }
+    }
+
+    private void VerImagen(string? ruta)
+    {
+        if (!string.IsNullOrWhiteSpace(ruta))
+        {
+            Nav.NavigateTo(ruta, forceLoad: true);
+        }
+    }
+
+    private static Color ColorHito(string hito) => hito switch
+    {
+        Hitos.Entregado => Color.Success,
+        Hitos.EnTransito or Hitos.EnRepartoFinal => Color.Info,
+        Hitos.EnCentroDistribucion or Hitos.SalidaAlmacen => Color.Warning,
+        Hitos.Registrada => Color.Default,
+        _ => Color.Primary
+    };
+}

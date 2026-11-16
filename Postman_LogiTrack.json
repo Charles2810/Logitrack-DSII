@@ -1,0 +1,1568 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+    "name": "LogiTrack Solutions - API",
+    "description": "Colección de pruebas de la API REST de LogiTrack Solutions.\n\nORDEN RECOMENDADO\n1. Ejecutar la carpeta 01 Autenticación (guarda los tokens de cada rol).\n2. Ejecutar 02 Catálogos.\n3. Ejecutar 03 Guías -> crear guía y asignarla a una hoja de ruta.\n4. Ejecutar 05 Checkpoints (hitos 2, 3, 4 y 5) con el token del conductor.\n5. Ejecutar 06 Incidencias y 07 Entregas.\n6. Ejecutar el resto de carpetas.\n\nLa cuenta del conductor Carlos Soliz ya tiene la hoja de ruta 1 (Pendiente) en la carga inicial, por lo que una guía nueva asignada a la hoja 1 puede avanzar por todos los hitos.\n\nLos scripts de prueba guardan automáticamente los identificadores creados en variables de colección (idGuia, idHojaRuta, idCliente, etc.).\n\nContraseña de todos los usuarios demo: LogiTrack2026!",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5163" },
+    { "key": "passwordDemo", "value": "LogiTrack2026!" },
+    { "key": "tokenAdminSistema", "value": "" },
+    { "key": "tokenAdminLogistico", "value": "" },
+    { "key": "tokenConductor", "value": "" },
+    { "key": "tokenAlmacen", "value": "" },
+    { "key": "tokenSupervisor", "value": "" },
+    { "key": "idGuia", "value": "4" },
+    { "key": "codigoGuia", "value": "LT-00000001" },
+    { "key": "idHojaRuta", "value": "1" },
+    { "key": "idCliente", "value": "1" },
+    { "key": "idProducto", "value": "1" },
+    { "key": "idVehiculo", "value": "1" },
+    { "key": "idUsuarioNuevo", "value": "8" },
+    { "key": "idIncidencia", "value": "1" },
+    { "key": "idEntrega", "value": "1" },
+    { "key": "idMovimiento", "value": "1" },
+    { "key": "idNotificacion", "value": "1" },
+    { "key": "rutaArchivo", "value": "/uploads/evidencias/demo.png" }
+  ],
+  "item": [
+    {
+      "name": "01 Autenticación",
+      "item": [
+        {
+          "name": "Login - Administrador Logístico (Ana)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const r = pm.response.json();",
+                  "pm.test('Login correcto (200)', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('tokenAdminLogistico', r.token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"ana.rojas@logitrack.test\",\n  \"password\": \"{{passwordDemo}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Guarda el token de Ana Rojas (Administrador Logístico) en {{tokenAdminLogistico}}."
+          }
+        },
+        {
+          "name": "Login - Administrador del Sistema (Luis)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const r = pm.response.json();",
+                  "pm.test('Login correcto (200)', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('tokenAdminSistema', r.token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"luis.mendez@logitrack.test\",\n  \"password\": \"{{passwordDemo}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Guarda el token de Luis Mendez (Administrador del Sistema) en {{tokenAdminSistema}}."
+          }
+        },
+        {
+          "name": "Login - Conductor (Carlos)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const r = pm.response.json();",
+                  "pm.test('Login correcto (200)', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('tokenConductor', r.token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"carlos.soliz@logitrack.test\",\n  \"password\": \"{{passwordDemo}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Guarda el token de Carlos Soliz (Conductor/Operador) en {{tokenConductor}}."
+          }
+        },
+        {
+          "name": "Login - Personal de Almacén (Marta)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const r = pm.response.json();",
+                  "pm.test('Login correcto (200)', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('tokenAlmacen', r.token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"marta.vaca@logitrack.test\",\n  \"password\": \"{{passwordDemo}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Guarda el token de Marta Vaca (Personal de Almacén) en {{tokenAlmacen}}."
+          }
+        },
+        {
+          "name": "Login - Supervisor (Pedro)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const r = pm.response.json();",
+                  "pm.test('Login correcto (200)', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('tokenSupervisor', r.token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"pedro.eguez@logitrack.test\",\n  \"password\": \"{{passwordDemo}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Guarda el token de Pedro Egüez (Centro de Control/Supervisor) en {{tokenSupervisor}}."
+          }
+        },
+        {
+          "name": "Mi perfil",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Sesión válida (200)', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminLogistico}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me"]
+            },
+            "description": "Devuelve los datos del usuario autenticado a partir del JWT."
+          }
+        },
+        {
+          "name": "Cambiar contraseña (opcional)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenConductor}}", "type": "string" }] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"passwordActual\": \"{{passwordDemo}}\",\n  \"passwordNueva\": \"NuevaClave2026!\",\n  \"confirmacion\": \"NuevaClave2026!\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/cambiar-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "cambiar-password"]
+            },
+            "description": "ADVERTENCIA: si se ejecuta cambia la contraseña del conductor. Sirve para probar RNF de seguridad. Volver a ejecutar database.sql para restaurar LogiTrack2026!."
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 Catálogos",
+      "item": [
+        {
+          "name": "Obtener catálogos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Catálogos obtenidos (200)', () => pm.response.to.have.status(200));",
+                  "const c = pm.response.json();",
+                  "pm.test('Incluye roles, almacenes e hitos', () => { pm.expect(c.roles.length).to.be.greaterThan(0); pm.expect(c.almacenes.length).to.be.greaterThan(0); pm.expect(c.hitos.length).to.be.greaterThan(0); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminLogistico}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/catalogos",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "catalogos"]
+            },
+            "description": "Roles, almacenes, tipos de carga, hitos, tipos de incidencia, clientes, productos, vehículos, conductores, personal de almacén y supervisores."
+          }
+        },
+        {
+          "name": "Listar conductores",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminLogistico}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/catalogos/conductores",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "catalogos", "conductores"]
+            },
+            "description": "Conductores activos disponibles para asignar a una hoja de ruta."
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 Guías de envío",
+      "item": [
+        {
+          "name": "Listar guías (paginado)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Listado obtenido (200)', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Respuesta paginada', () => { pm.expect(r).to.have.property('items'); pm.expect(r).to.have.property('total'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminLogistico}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/guias?page=1&pageSize=10&buscar=",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "guias"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "10" },
+                { "key": "buscar", "value": "" }
+              ]
+            },
+            "description": "Filtros: buscar, idHito, idCliente, idHojaRuta, desde, hasta, page, pageSize."
+          }
+        },
+        {
+          "name": "Crear guía (guarda idGuia/codigoGuia)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const ok = pm.response.code === 201;",
+                  "pm.test('Guía creada (201)', () => pm.expect(ok).to.be.true);",
+                  "if (ok) { const g = pm.response.json(); pm.collectionVariables.set('idGuia', String(g.idGuia)); pm.collectionVariables.set('codigoGuia', g.codigoGuia); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminLogistico}}", "type": "string" }] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idCliente\": 1,\n  \"idAlmacenOrigen\": 1,\n  \"idTipoCarga\": 1,\n  \"idHojaRuta\": null,\n  \"destinatario\": \"Destinatario Postman\",\n  \"direccionDestino\": \"Av. Demo 123, Santa Cruz\",\n  \"pesoKg\": 12.5,\n  \"volumenM3\": 0.08,\n  \"detalles\": [\n    { \"idProducto\": 1, \"cantidad\": 2 }\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/guias",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "guias"]
+            },
+            "description": "Solo Administrador Logístico. El código LT-XXXXXXXX lo genera la base de datos (columna calculada)."
+          }
+        },
+        {
+          "name": "Obtener guía por id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Guía obtenida (200)', () => pm.response.to.have.status(200));",
+                  "const g = pm.response.json();",
+                  "pm.test('Tiene código de guía', () => pm.expect(g.codigoGuia).to.match(/^LT-\\d{8}$/));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminLogistico}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/guias/{{idGuia}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "guias", "{{idGuia}}"]
+            },
+            "description": "Incluye detalles, hito actual, hoja de ruta, incidencias y si tiene entrega."
+          }
+        },
+        {
+          "name": "Actualizar guía",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminLogistico}}", "type": "string" }] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idCliente\": 1,\n  \"idAlmacenOrigen\": 1,\n  \"idTipoCarga\": 2,\n  \"destinatario\": \"Destinatario Postman (editado)\",\n  \"direccionDestino\": \"Av. Demo 456, Santa Cruz\",\n  \"pesoKg\": 15.75,\n  \"volumenM3\": 0.09,\n  \"detalles\": [\n    { \"idProducto\": 1, \"cantidad\": 3 }\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/guias/{{idGuia}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "guias", "{{idGuia}}"]
+            },
+            "description": "Solo se permite mientras la guía está en estado Registrada (RN03)."
+          }
+        },
+        {
+          "name": "Asignar guía a hoja de ruta",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Asignación correcta (200)', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminLogistico}}", "type": "string" }] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idHojaRuta\": {{idHojaRuta}}\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/guias/{{idGuia}}/hoja-ruta",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "guias", "{{idGuia}}", "hoja-ruta"]
+            },
+            "description": "RN03: solo guías Registradas y hojas de ruta no Finalizadas. La hoja 1 pertenece al conductor Carlos Soliz."
+          }
+        },
+        {
+          "name": "Siguiente hito sugerido",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenConductor}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/guias/{{idGuia}}/siguiente-hito",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "guias", "{{idGuia}}", "siguiente-hito"]
+            },
+            "description": "Devuelve el siguiente hito permitido. Responde 204 cuando solo queda Entregado (se registra con la entrega)."
+          }
+        },
+        {
+          "name": "Checkpoints de la guía",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminLogistico}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/guias/{{idGuia}}/checkpoints",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "guias", "{{idGuia}}", "checkpoints"]
+            },
+            "description": "Historial de hitos registrados para la guía."
+          }
+        },
+        {
+          "name": "Incidencias de la guía",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminLogistico}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/guias/{{idGuia}}/incidencias",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "guias", "{{idGuia}}", "incidencias"]
+            },
+            "description": "Incidencias asociadas a la guía."
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 Hojas de ruta",
+      "item": [
+        {
+          "name": "Listar hojas de ruta",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Listado obtenido (200)', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminLogistico}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/hojas-ruta",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "hojas-ruta"]
+            },
+            "description": "Todas las hojas de ruta con sus guías, peso y volumen consolidados."
+          }
+        },
+        {
+          "name": "Obtener hoja de ruta por id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminLogistico}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/hojas-ruta/{{idHojaRuta}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "hojas-ruta", "{{idHojaRuta}}"]
+            },
+            "description": "Detalle con guías asignadas y progreso."
+          }
+        },
+        {
+          "name": "Mis hojas de ruta (conductor)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Listado del conductor (200)', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenConductor}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/hojas-ruta/mias",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "hojas-ruta", "mias"]
+            },
+            "description": "Solo Conductor/Operador. Devuelve las hojas no finalizadas asignadas al usuario del token."
+          }
+        },
+        {
+          "name": "Recursos disponibles (conductores y vehículos)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Recursos obtenidos (200)', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Respuesta con conductores y vehículos', () => { pm.expect(r).to.have.property('conductores'); pm.expect(r).to.have.property('vehiculos'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminLogistico}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/hojas-ruta/recursos",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "hojas-ruta", "recursos"]
+            },
+            "description": "Solo Administrador Logístico. En la carga inicial ambos conductores ya tienen hoja activa, por lo que la lista de conductores puede estar vacía."
+          }
+        },
+        {
+          "name": "Crear hoja de ruta (opcional)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const ok = pm.response.code === 201;",
+                  "pm.test('Crear hoja: 201 o error de recursos (400/409)', () => pm.expect([201, 400, 409]).to.include(pm.response.code));",
+                  "if (ok) { const h = pm.response.json(); pm.collectionVariables.set('idHojaRuta', String(h.idHojaRuta)); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminLogistico}}", "type": "string" }] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idVehiculo\": {{idVehiculo}},\n  \"idConductor\": 6\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/hojas-ruta",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "hojas-ruta"]
+            },
+            "description": "Requiere un conductor y un vehículo sin hoja activa (RN04). Con la carga inicial puede fallar con error de regla de negocio; en ese caso usar la hoja 1."
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 Checkpoints (avance de hitos)",
+      "item": [
+        {
+          "name": "Listar checkpoints de la guía",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenConductor}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/checkpoints/guia/{{idGuia}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "checkpoints", "guia", "{{idGuia}}"]
+            },
+            "description": "Historial ordenado de checkpoints."
+          }
+        },
+        {
+          "name": "Checkpoint 1 - Salida de Almacén (hito 2)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Checkpoint registrado (201)', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenConductor}}", "type": "string" }] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idGuia\": {{idGuia}},\n  \"idHito\": 2,\n  \"idAlmacen\": 1\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/checkpoints",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "checkpoints"]
+            },
+            "description": "RN05: los hitos avanzan en orden. Requiere guía asignada a la hoja del conductor del token."
+          }
+        },
+        {
+          "name": "Checkpoint 2 - En Tránsito (hito 3)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Checkpoint registrado (201)', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenConductor}}", "type": "string" }] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idGuia\": {{idGuia}},\n  \"idHito\": 3,\n  \"idAlmacen\": 2\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/checkpoints",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "checkpoints"]
+            },
+            "description": "Ejecutar después del checkpoint de Salida de Almacén."
+          }
+        },
+        {
+          "name": "Checkpoint 3 - En CD Local (hito 4)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Checkpoint registrado (201)', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenConductor}}", "type": "string" }] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idGuia\": {{idGuia}},\n  \"idHito\": 4,\n  \"idAlmacen\": 2\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/checkpoints",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "checkpoints"]
+            },
+            "description": "Ejecutar después del checkpoint En Tránsito."
+          }
+        },
+        {
+          "name": "Checkpoint 4 - En Reparto Final (hito 5)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Checkpoint registrado (201)', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenConductor}}", "type": "string" }] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idGuia\": {{idGuia}},\n  \"idHito\": 5,\n  \"idAlmacen\": 2\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/checkpoints",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "checkpoints"]
+            },
+            "description": "El hito Entregado (6) no se registra aquí: lo genera automáticamente la entrega."
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 Incidencias",
+      "item": [
+        {
+          "name": "Listar incidencias (paginado)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenSupervisor}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/incidencias?page=1&pageSize=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "incidencias"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "20" }
+              ]
+            },
+            "description": "Filtros opcionales: idGuia, idTipoIncidencia."
+          }
+        },
+        {
+          "name": "Incidencias por guía",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenSupervisor}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/incidencias/guia/{{idGuia}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "incidencias", "guia", "{{idGuia}}"]
+            },
+            "description": "Incidencias de una guía específica."
+          }
+        },
+        {
+          "name": "Registrar incidencia (guarda idIncidencia)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const ok = pm.response.code === 201;",
+                  "pm.test('Incidencia registrada (201)', () => pm.expect(ok).to.be.true);",
+                  "if (ok) { pm.collectionVariables.set('idIncidencia', String(pm.response.json().idIncidencia)); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenConductor}}", "type": "string" }] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idGuia\": {{idGuia}},\n  \"idTipoIncidencia\": 1,\n  \"descripcion\": \"Cierre vial reportado durante la ruta de prueba.\",\n  \"rutaFoto\": \"{{rutaArchivo}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/incidencias",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "incidencias"]
+            },
+            "description": "RN08: la incidencia exige descripción y foto. Roles: Conductor/Operador y Centro de Control/Supervisor."
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 Entregas",
+      "item": [
+        {
+          "name": "Listar entregas (paginado)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminLogistico}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/entregas?page=1&pageSize=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "entregas"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "20" }
+              ]
+            },
+            "description": "Filtro opcional: idGuia."
+          }
+        },
+        {
+          "name": "Registrar entrega (guarda idEntrega)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const ok = pm.response.code === 201;",
+                  "pm.test('Entrega registrada (201)', () => pm.expect(ok).to.be.true);",
+                  "if (ok) { pm.collectionVariables.set('idEntrega', String(pm.response.json().idEntrega)); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenConductor}}", "type": "string" }] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idGuia\": {{idGuia}},\n  \"nombreReceptor\": \"Receptor Postman\",\n  \"rutaFirma\": \"{{rutaArchivo}}\",\n  \"rutaFoto\": \"{{rutaArchivo}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/entregas",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "entregas"]
+            },
+            "description": "RN07: exige firma y foto. La base de datos marca la guía como Entregado, bloquea nuevos cambios y finaliza la hoja si todas las guías fueron entregadas."
+          }
+        },
+        {
+          "name": "Entrega por guía",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Entrega obtenida (200)', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminLogistico}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/entregas/guia/{{idGuia}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "entregas", "guia", "{{idGuia}}"]
+            },
+            "description": "Comprobante de entrega de la guía. Se consulta después de registrar la entrega."
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 Inventario",
+      "item": [
+        {
+          "name": "Consultar inventario",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAlmacen}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/inventario",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inventario"]
+            },
+            "description": "Stock por almacén y producto. Filtros: idAlmacen, buscar."
+          }
+        },
+        {
+          "name": "Alertas de stock bajo",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAlmacen}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/inventario/alertas?umbral=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inventario", "alertas"],
+              "query": [{ "key": "umbral", "value": "20" }]
+            },
+            "description": "Productos con stock menor o igual al umbral."
+          }
+        },
+        {
+          "name": "Listar movimientos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAlmacen}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/inventario/movimientos?page=1&pageSize=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inventario", "movimientos"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "20" }
+              ]
+            },
+            "description": "Filtros: idAlmacen, idProducto, tipo (ENTRADA/SALIDA), desde, hasta."
+          }
+        },
+        {
+          "name": "Registrar movimiento ENTRADA (guarda idMovimiento)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const ok = pm.response.code === 201;",
+                  "pm.test('Movimiento registrado (201)', () => pm.expect(ok).to.be.true);",
+                  "if (ok) { pm.collectionVariables.set('idMovimiento', String(pm.response.json().idMovimiento)); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAlmacen}}", "type": "string" }] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idAlmacen\": 1,\n  \"idProducto\": 1,\n  \"idGuia\": null,\n  \"tipoMovimiento\": \"ENTRADA\",\n  \"cantidad\": 10\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/inventario/movimientos",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inventario", "movimientos"]
+            },
+            "description": "El stock lo actualiza un trigger. La SALIDA no puede dejar stock negativo."
+          }
+        },
+        {
+          "name": "Registrar movimiento SALIDA",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAlmacen}}", "type": "string" }] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idAlmacen\": 1,\n  \"idProducto\": 1,\n  \"idGuia\": null,\n  \"tipoMovimiento\": \"SALIDA\",\n  \"cantidad\": 3\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/inventario/movimientos",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inventario", "movimientos"]
+            },
+            "description": "Roles permitidos: Personal de Almacén, Administrador Logístico y Administrador del Sistema."
+          }
+        }
+      ]
+    },
+    {
+      "name": "09 Notificaciones",
+      "item": [
+        {
+          "name": "Listar notificaciones",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminLogistico}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/notificaciones?leida=false&limite=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "notificaciones"],
+              "query": [
+                { "key": "leida", "value": "false" },
+                { "key": "limite", "value": "20" }
+              ]
+            },
+            "description": "Notificaciones del usuario del token. Filtro opcional leida."
+          }
+        },
+        {
+          "name": "Contador de no leídas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminLogistico}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/notificaciones/no-leidas",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "notificaciones", "no-leidas"]
+            },
+            "description": "Devuelve el total de notificaciones no leídas."
+          }
+        },
+        {
+          "name": "Marcar notificación como leída",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Notificación marcada (200)', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminLogistico}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/notificaciones/{{idNotificacion}}/leida",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "notificaciones", "{{idNotificacion}}", "leida"]
+            },
+            "description": "Solo el dueño de la notificación puede marcarla."
+          }
+        },
+        {
+          "name": "Marcar todas como leídas",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Todas marcadas (200)', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminLogistico}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/notificaciones/leer-todas",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "notificaciones", "leer-todas"]
+            },
+            "description": "Marca leídas todas las notificaciones del usuario autenticado."
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 Reportes",
+      "item": [
+        {
+          "name": "Dashboard",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Dashboard obtenido (200)', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json();",
+                  "pm.test('Incluye contadores y últimas guías', () => { pm.expect(d).to.have.property('totalGuias'); pm.expect(d).to.have.property('ultimasGuias'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenSupervisor}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/reportes/dashboard",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "reportes", "dashboard"]
+            },
+            "description": "Indicadores para el panel principal: guías por hito, hojas activas, incidencias y peso entregado."
+          }
+        },
+        {
+          "name": "Reporte de envíos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Reporte obtenido (200)', () => pm.response.to.have.status(200));",
+                  "pm.test('Es una lista', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenSupervisor}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/reportes/envios?limite=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "reportes", "envios"],
+              "query": [{ "key": "limite", "value": "50" }]
+            },
+            "description": "Filtros: buscar, estado, cliente, desde, hasta, conIncidencias, limite. Roles: Administrador del Sistema, Administrador Logístico y Supervisor."
+          }
+        }
+      ]
+    },
+    {
+      "name": "11 Rastreo público",
+      "item": [
+        {
+          "name": "Consultar tracking por código",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Tracking obtenido (200)', () => pm.response.to.have.status(200));",
+                  "const t = pm.response.json();",
+                  "pm.test('Tiene estado y eventos', () => { pm.expect(t.estadoActual).to.be.a('string'); pm.expect(t.eventos).to.be.an('array'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/tracking/{{codigoGuia}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tracking", "{{codigoGuia}}"]
+            },
+            "description": "Público (sin token). La vista solo expone datos no personales (RN10)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "12 Usuarios",
+      "item": [
+        {
+          "name": "Listar usuarios",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminSistema}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/usuarios",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "usuarios"]
+            },
+            "description": "Solo Administrador del Sistema."
+          }
+        },
+        {
+          "name": "Obtener usuario por id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminSistema}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/usuarios/3",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "usuarios", "3"]
+            },
+            "description": "Usuario demo 3: Carlos Soliz."
+          }
+        },
+        {
+          "name": "Crear usuario (guarda idUsuarioNuevo)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const ok = pm.response.code === 201;",
+                  "pm.test('Usuario creado (201)', () => pm.expect(ok).to.be.true);",
+                  "if (ok) { pm.collectionVariables.set('idUsuarioNuevo', String(pm.response.json().idUsuario)); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminSistema}}", "type": "string" }] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idRol\": 3,\n  \"nombreCompleto\": \"Conductor Postman\",\n  \"correo\": \"conductor.postman@logitrack.test\",\n  \"password\": \"{{passwordDemo}}\",\n  \"activo\": true\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/usuarios",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "usuarios"]
+            },
+            "description": "Si se ejecuta dos veces falla por correo duplicado (409). Cambiar el correo o recargar database.sql."
+          }
+        },
+        {
+          "name": "Actualizar usuario",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminSistema}}", "type": "string" }] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idRol\": 3,\n  \"nombreCompleto\": \"Conductor Postman Editado\",\n  \"correo\": \"conductor.postman@logitrack.test\",\n  \"activo\": true\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/usuarios/{{idUsuarioNuevo}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "usuarios", "{{idUsuarioNuevo}}"]
+            },
+            "description": "Roles y datos editables; el correo debe seguir siendo único."
+          }
+        },
+        {
+          "name": "Activar / desactivar usuario",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminSistema}}", "type": "string" }] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activo\": false\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/usuarios/{{idUsuarioNuevo}}/estado",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "usuarios", "{{idUsuarioNuevo}}", "estado"]
+            },
+            "description": "RN11: los usuarios no se eliminan, solo se activan o desactivan."
+          }
+        },
+        {
+          "name": "Restablecer contraseña",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminSistema}}", "type": "string" }] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password\": \"OtraClave2026!\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/usuarios/{{idUsuarioNuevo}}/reset-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "usuarios", "{{idUsuarioNuevo}}", "reset-password"]
+            },
+            "description": "El administrador del sistema puede restablecer la contraseña de cualquier usuario."
+          }
+        }
+      ]
+    },
+    {
+      "name": "13 Clientes",
+      "item": [
+        {
+          "name": "Listar clientes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminLogistico}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/clientes",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "clientes"]
+            },
+            "description": "Catálogo de clientes."
+          }
+        },
+        {
+          "name": "Crear cliente (guarda idCliente)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const ok = pm.response.code === 201;",
+                  "pm.test('Cliente creado (201)', () => pm.expect(ok).to.be.true);",
+                  "if (ok) { pm.collectionVariables.set('idCliente', String(pm.response.json().idCliente)); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminLogistico}}", "type": "string" }] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"razonSocial\": \"Cliente Postman SRL\",\n  \"nit\": \"123456789012\",\n  \"telefono\": \"70000000\",\n  \"direccion\": \"Av. Cliente 100, Santa Cruz\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/clientes",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "clientes"]
+            },
+            "description": "Roles: Administrador del Sistema y Administrador Logístico."
+          }
+        },
+        {
+          "name": "Actualizar cliente",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminLogistico}}", "type": "string" }] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"razonSocial\": \"Cliente Postman SRL (editado)\",\n  \"nit\": \"123456789012\",\n  \"telefono\": \"71111111\",\n  \"direccion\": \"Av. Cliente 200, Santa Cruz\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/clientes/{{idCliente}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "clientes", "{{idCliente}}"]
+            },
+            "description": "Actualiza los datos del cliente creado previamente."
+          }
+        }
+      ]
+    },
+    {
+      "name": "14 Productos",
+      "item": [
+        {
+          "name": "Listar productos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAlmacen}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/productos",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "productos"]
+            },
+            "description": "Catálogo de productos con peso y volumen unitario."
+          }
+        },
+        {
+          "name": "Crear producto (guarda idProducto)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const ok = pm.response.code === 201;",
+                  "pm.test('Producto creado (201)', () => pm.expect(ok).to.be.true);",
+                  "if (ok) { pm.collectionVariables.set('idProducto', String(pm.response.json().idProducto)); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminLogistico}}", "type": "string" }] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sku\": \"SKU-POSTMAN-01\",\n  \"nombre\": \"Producto Postman\",\n  \"pesoUnitarioKg\": 2.5,\n  \"volumenUnitarioM3\": 0.015\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/productos",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "productos"]
+            },
+            "description": "El SKU debe ser único."
+          }
+        },
+        {
+          "name": "Actualizar producto",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminLogistico}}", "type": "string" }] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sku\": \"SKU-POSTMAN-01\",\n  \"nombre\": \"Producto Postman Editado\",\n  \"pesoUnitarioKg\": 3.0,\n  \"volumenUnitarioM3\": 0.02\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/productos/{{idProducto}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "productos", "{{idProducto}}"]
+            },
+            "description": "El SKU no se modifica."
+          }
+        }
+      ]
+    },
+    {
+      "name": "15 Vehículos",
+      "item": [
+        {
+          "name": "Listar vehículos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminLogistico}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/vehiculos",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "vehiculos"]
+            },
+            "description": "Flota con estado (Disponible, En ruta, Mantenimiento)."
+          }
+        },
+        {
+          "name": "Obtener vehículo por id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminLogistico}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/vehiculos/{{idVehiculo}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "vehiculos", "{{idVehiculo}}"]
+            },
+            "description": "Detalle de un vehículo."
+          }
+        },
+        {
+          "name": "Crear vehículo (guarda idVehiculo)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const ok = pm.response.code === 201;",
+                  "pm.test('Vehículo creado (201)', () => pm.expect(ok).to.be.true);",
+                  "if (ok) { pm.collectionVariables.set('idVehiculo', String(pm.response.json().idVehiculo)); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminLogistico}}", "type": "string" }] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"placa\": \"POSTMAN-1\",\n  \"tipo\": \"Camión 3 t\",\n  \"capacidadKg\": 3000,\n  \"capacidadM3\": 18,\n  \"estado\": \"Disponible\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/vehiculos",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "vehiculos"]
+            },
+            "description": "La placa debe ser única."
+          }
+        },
+        {
+          "name": "Actualizar vehículo",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminLogistico}}", "type": "string" }] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"placa\": \"POSTMAN-1\",\n  \"tipo\": \"Camión 5 t\",\n  \"capacidadKg\": 5000,\n  \"capacidadM3\": 25,\n  \"estado\": \"Disponible\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/vehiculos/{{idVehiculo}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "vehiculos", "{{idVehiculo}}"]
+            },
+            "description": "Actualiza tipo y capacidades."
+          }
+        },
+        {
+          "name": "Cambiar estado del vehículo",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminLogistico}}", "type": "string" }] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"Mantenimiento\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/vehiculos/{{idVehiculo}}/estado",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "vehiculos", "{{idVehiculo}}", "estado"]
+            },
+            "description": "Un vehículo en ruta no puede pasar a Mantenimiento (RN04)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "16 Archivos (evidencias)",
+      "item": [
+        {
+          "name": "Subir archivo (firma/foto/evidencia)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const ok = [200, 201].includes(pm.response.code);",
+                  "pm.test('Archivo subido (200/201)', () => pm.expect(ok).to.be.true);",
+                  "if (ok) { pm.collectionVariables.set('rutaArchivo', pm.response.json().ruta); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenConductor}}", "type": "string" }] },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "archivo", "type": "file", "src": "logo.png", "description": "Seleccione una imagen PNG/JPG/WEBP de máximo 5 MB." },
+                { "key": "carpeta", "type": "text", "value": "evidencias", "description": "Valores permitidos: firmas, fotos, evidencias." }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/files/upload",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "files", "upload"]
+            },
+            "description": "Devuelve la ruta relativa (/uploads/evidencias/...). Guarde la ruta en {{rutaArchivo}} para usarla en incidencias y entregas."
+          }
+        }
+      ]
+    }
+  ]
+}

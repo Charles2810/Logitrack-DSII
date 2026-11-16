@@ -1,0 +1,182 @@
+@page "/usuarios"
+@attribute [Authorize(Roles = "Administrador del Sistema")]
+@inject ApiClient Api
+@inject CatalogosService Catalogos
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>LogiTrack Solutions · Usuarios</PageTitle>
+
+<div class="d-flex justify-space-between align-center flex-wrap gap-3 mb-4">
+    <div>
+        <MudText Typo="Typo.h4" Style="font-weight:800;">Usuarios</MudText>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">
+            Administración de cuentas, roles y credenciales del sistema.
+        </MudText>
+    </div>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd"
+               OnClick="NuevoAsync">Nuevo usuario</MudButton>
+</div>
+
+<MudPaper Elevation="2" Class="pa-4 mb-4">
+    <div class="d-flex gap-2 align-center flex-wrap">
+        <MudTextField @bind-Value="_buscar" Label="Buscar por nombre o correo" Variant="Variant.Outlined"
+                      Immediate="true" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                      DebounceInterval="400" OnDebounceIntervalElapsed="@(_ => CargarAsync())"
+                      Style="min-width:300px;" />
+        <MudSelect T="string" @bind-Value="_estadoFiltro" @bind-Value:after="CargarAsync" Label="Estado"
+                   Variant="Variant.Outlined" Clearable="true" AnchorOrigin="Origin.BottomCenter"
+                   Style="max-width:200px;">
+            <MudSelectItem T="string" Value="@FiltroActivos">Activos</MudSelectItem>
+            <MudSelectItem T="string" Value="@FiltroInactivos">Inactivos</MudSelectItem>
+        </MudSelect>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh"
+                   OnClick="CargarAsync">Actualizar</MudButton>
+    </div>
+</MudPaper>
+
+<MudPaper Elevation="2">
+    <MudTable Items="_items" Loading="_cargando" Dense="true" Hover="true" Striped="true" Breakpoint="Breakpoint.Sm">
+        <HeaderContent>
+            <MudTh>Nombre</MudTh>
+            <MudTh>Correo</MudTh>
+            <MudTh>Rol</MudTh>
+            <MudTh>Estado</MudTh>
+            <MudTh>Creado</MudTh>
+            <MudTh align="Right">Acciones</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd><b>@context.NombreCompleto</b></MudTd>
+            <MudTd>@context.Correo</MudTd>
+            <MudTd>
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="@ColorRol(context.Rol)">
+                    @context.Rol
+                </MudChip>
+            </MudTd>
+            <MudTd>
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Filled"
+                         Color="@(context.Activo ? Color.Success : Color.Error)">
+                    @(context.Activo ? "Activo" : "Inactivo")
+                </MudChip>
+            </MudTd>
+            <MudTd>@context.FechaCreacion.ToLocalTime().ToString("dd/MM/yyyy")</MudTd>
+            <MudTd align="Right">
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
+                               title="Editar" OnClick="@(() => EditarAsync(context))" />
+                <MudIconButton Icon="@Icons.Material.Filled.Key" Size="Size.Small" Color="Color.Warning"
+                               title="Restablecer contraseña" OnClick="@(() => ResetPasswordAsync(context))" />
+                <MudIconButton Icon="@(context.Activo ? Icons.Material.Filled.Block : Icons.Material.Filled.CheckCircle)"
+                               Size="Size.Small" Color="@(context.Activo ? Color.Error : Color.Success)"
+                               title="@(context.Activo ? "Desactivar" : "Activar")"
+                               OnClick="@(() => CambiarEstadoAsync(context))" />
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Typo="Typo.body2" Class="mud-text-secondary py-4">
+                No se encontraron usuarios con los filtros aplicados.
+            </MudText>
+        </NoRecordsContent>
+    </MudTable>
+</MudPaper>
+
+@code {
+    private List<UsuarioDto> _items = new();
+    private string? _buscar;
+    private string? _estadoFiltro;
+    private const string FiltroActivos = "activos";
+    private const string FiltroInactivos = "inactivos";
+    private bool _cargando = true;
+
+    protected override Task OnInitializedAsync() => CargarAsync();
+
+    private async Task CargarAsync()
+    {
+        _cargando = true;
+        try
+        {
+            var query = new List<string>();
+            if (!string.IsNullOrWhiteSpace(_buscar)) query.Add($"buscar={Uri.EscapeDataString(_buscar.Trim())}");
+            if (_estadoFiltro == "activos") query.Add("activo=true");
+            if (_estadoFiltro == "inactivos") query.Add("activo=false");
+
+            var url = "api/usuarios" + (query.Count > 0 ? "?" + string.Join("&", query) : string.Empty);
+            _items = await Api.GetAsync<List<UsuarioDto>>(url) ?? new();
+        }
+        catch (ApiException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    private async Task NuevoAsync()
+    {
+        var parameters = new DialogParameters { { nameof(UsuarioDialog.Edicion), false } };
+        var dialog = await DialogService.ShowAsync<UsuarioDialog>("Nuevo usuario", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true });
+
+        if ((await dialog.Result) is { Canceled: false })
+        {
+            await CargarAsync();
+        }
+    }
+
+    private async Task EditarAsync(UsuarioDto usuario)
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(UsuarioDialog.Usuario), usuario },
+            { nameof(UsuarioDialog.Edicion), true }
+        };
+
+        var dialog = await DialogService.ShowAsync<UsuarioDialog>("Editar usuario", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true });
+
+        if ((await dialog.Result) is { Canceled: false })
+        {
+            await CargarAsync();
+        }
+    }
+
+    private async Task ResetPasswordAsync(UsuarioDto usuario)
+    {
+        var parameters = new DialogParameters { { nameof(ResetPasswordDialog.Usuario), usuario } };
+        var dialog = await DialogService.ShowAsync<ResetPasswordDialog>("Restablecer contraseña", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true });
+
+        await dialog.Result;
+    }
+
+    private async Task CambiarEstadoAsync(UsuarioDto usuario)
+    {
+        try
+        {
+            await Api.PatchAsync<UsuarioDto>($"api/usuarios/{usuario.IdUsuario}/estado",
+                new CambiarEstadoUsuarioRequest { Activo = !usuario.Activo });
+
+            Snackbar.Add(usuario.Activo
+                ? "Usuario desactivado correctamente."
+                : "Usuario activado correctamente.", Severity.Success);
+
+            Catalogos.Invalidar();
+            await CargarAsync();
+        }
+        catch (ApiException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private static Color ColorRol(string rol) => rol switch
+    {
+        Roles.AdministradorSistema => Color.Error,
+        Roles.AdministradorLogistico => Color.Primary,
+        Roles.CentroControl => Color.Secondary,
+        Roles.Conductor => Color.Info,
+        Roles.PersonalAlmacen => Color.Warning,
+        _ => Color.Default
+    };
+}

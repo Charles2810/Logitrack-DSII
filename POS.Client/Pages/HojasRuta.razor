@@ -1,0 +1,133 @@
+@page "/hojas-ruta"
+@attribute [Authorize(Roles = "Administrador del Sistema,Administrador Logístico,Conductor/Operador,Centro de Control/Supervisor")]
+@inject ApiClient Api
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>LogiTrack Solutions · Hojas de ruta</PageTitle>
+
+<div class="d-flex justify-space-between align-center flex-wrap gap-3 mb-4">
+    <div>
+        <MudText Typo="Typo.h4" Style="font-weight:800;">Hojas de ruta</MudText>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">
+            Asignación de vehículos y conductores, control de capacidad y avance de entregas.
+        </MudText>
+    </div>
+    <AuthorizeView Roles="@Roles.AdministradorLogistico">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="NuevaAsync">Nueva hoja de ruta</MudButton>
+    </AuthorizeView>
+</div>
+
+<MudPaper Elevation="2" Class="pa-4 mb-4">
+    <div class="d-flex gap-2 align-center flex-wrap">
+        <MudSelect T="string" @bind-Value="_estado" @bind-Value:after="BuscarAsync" Label="Estado"
+                   Variant="Variant.Outlined" Clearable="true" AnchorOrigin="Origin.BottomCenter" Style="max-width:260px;">
+            <MudSelectItem T="string" Value="@Estados.HojaPendiente">Pendiente</MudSelectItem>
+            <MudSelectItem T="string" Value="@Estados.HojaEnCurso">En curso</MudSelectItem>
+            <MudSelectItem T="string" Value="@Estados.HojaFinalizada">Finalizada</MudSelectItem>
+        </MudSelect>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh"
+                   OnClick="BuscarAsync">Actualizar</MudButton>
+    </div>
+</MudPaper>
+
+<MudPaper Elevation="2">
+    <MudTable @ref="_tabla" ServerData="CargarAsync" Dense="true" Hover="true" Striped="true" Breakpoint="Breakpoint.Sm">
+        <HeaderContent>
+            <MudTh>#</MudTh>
+            <MudTh>Vehículo</MudTh>
+            <MudTh>Conductor</MudTh>
+            <MudTh>Estado</MudTh>
+            <MudTh>Guías</MudTh>
+            <MudTh>Carga</MudTh>
+            <MudTh>Creada</MudTh>
+            <MudTh align="Right">Acciones</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd><b>@context.IdHojaRuta</b></MudTd>
+            <MudTd>
+                <div>@context.VehiculoPlaca</div>
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">@context.VehiculoTipo</MudText>
+            </MudTd>
+            <MudTd>@context.Conductor</MudTd>
+            <MudTd>
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="@ColorEstado(context.Estado)">
+                    @context.Estado
+                </MudChip>
+            </MudTd>
+            <MudTd>
+                @context.GuiasEntregadas / @context.TotalGuias
+                <MudProgressLinear Color="Color.Success" Value="@(context.TotalGuias == 0 ? 0 : context.GuiasEntregadas * 100 / context.TotalGuias)"
+                                   Size="Size.Small" Rounded="true" Class="mt-1" />
+            </MudTd>
+            <MudTd>
+                <MudText Typo="Typo.body2">@context.PesoTotal.ToString("N1") kg</MudText>
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">@context.VolumenTotal.ToString("N2") m³</MudText>
+            </MudTd>
+            <MudTd>@context.FechaCreacion.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</MudTd>
+            <MudTd align="Right">
+                <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary"
+                           Href="@($"/hojas-ruta/{context.IdHojaRuta}")" EndIcon="@Icons.Material.Filled.ArrowForward">
+                    Abrir
+                </MudButton>
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Typo="Typo.body2" Class="mud-text-secondary py-4">No hay hojas de ruta para mostrar.</MudText>
+        </NoRecordsContent>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new[] { 10, 20, 50 }" RowsPerPageString="Filas por página" />
+        </PagerContent>
+    </MudTable>
+</MudPaper>
+
+@code {
+    private MudTable<HojaRutaDto> _tabla = default!;
+    private string? _estado;
+
+    private async Task<TableData<HojaRutaDto>> CargarAsync(TableState state, CancellationToken token)
+    {
+        try
+        {
+            var url = $"api/hojas-ruta?page={state.Page + 1}&pageSize={state.PageSize}";
+            if (!string.IsNullOrWhiteSpace(_estado))
+            {
+                url += $"&estado={Uri.EscapeDataString(_estado)}";
+            }
+
+            var data = await Api.GetAsync<PagedResult<HojaRutaDto>>(url);
+            return new TableData<HojaRutaDto>
+            {
+                Items = data?.Items ?? new List<HojaRutaDto>(),
+                TotalItems = data?.Total ?? 0
+            };
+        }
+        catch (ApiException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+            return new TableData<HojaRutaDto> { Items = new List<HojaRutaDto>(), TotalItems = 0 };
+        }
+    }
+
+    private Task BuscarAsync() => _tabla == null ? Task.CompletedTask : _tabla.ReloadServerData();
+
+    private async Task NuevaAsync()
+    {
+        var dialog = await DialogService.ShowAsync<HojaRutaDialog>("Nueva hoja de ruta", new DialogParameters(),
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true });
+
+        if ((await dialog.Result) is { Canceled: false })
+        {
+            await BuscarAsync();
+        }
+    }
+
+    private static Color ColorEstado(string estado) => estado switch
+    {
+        Estados.HojaPendiente => Color.Warning,
+        Estados.HojaEnCurso => Color.Info,
+        Estados.HojaFinalizada => Color.Success,
+        _ => Color.Default
+    };
+}

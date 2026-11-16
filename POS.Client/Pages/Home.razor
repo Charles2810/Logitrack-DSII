@@ -1,0 +1,258 @@
+﻿@page "/"
+@attribute [Authorize]
+@inject ApiClient Api
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>LogiTrack Solutions · Panel principal</PageTitle>
+
+<div class="d-flex justify-space-between align-center flex-wrap gap-3 mb-5">
+    <div>
+        <MudText Typo="Typo.h4" Style="font-weight:800;">Panel principal</MudText>
+        <MudText Typo="Typo.body1" Class="mud-text-secondary">
+            Resumen operativo de la trazabilidad logística.
+        </MudText>
+    </div>
+    <div class="d-flex gap-2">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh"
+                   OnClick="CargarAsync" Disabled="_cargando">Actualizar</MudButton>
+        <AuthorizeView Roles="@Roles.AdministradorLogistico">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                       Href="/guias?nueva=true">Nueva guía</MudButton>
+        </AuthorizeView>
+    </div>
+</div>
+
+@if (_cargando)
+{
+    <div class="d-flex justify-center my-10"><MudProgressCircular Indeterminate="true" Color="Color.Primary" /></div>
+}
+else if (_data == null)
+{
+    <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">@_error</MudAlert>
+}
+else
+{
+    <MudGrid Spacing="3">
+        <MudItem xs="12" sm="6" lg="3">
+            <MudPaper Elevation="2" Class="pa-5">
+                <div class="d-flex justify-space-between align-start">
+                    <div>
+                        <MudText Typo="Typo.overline" Class="mud-text-secondary">Guías totales</MudText>
+                        <MudText Typo="Typo.h3" Style="font-weight:800;">@_data.TotalGuias</MudText>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">Registradas históricamente</MudText>
+                    </div>
+                    <MudAvatar Color="Color.Primary" Variant="Variant.Filled" Size="Size.Large">
+                        <MudIcon Icon="@Icons.Material.Filled.Description" />
+                    </MudAvatar>
+                </div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" lg="3">
+            <MudPaper Elevation="2" Class="pa-5">
+                <div class="d-flex justify-space-between align-start">
+                    <div>
+                        <MudText Typo="Typo.overline" Class="mud-text-secondary">En tránsito</MudText>
+                        <MudText Typo="Typo.h3" Style="font-weight:800;">@_data.GuiasEnTransito</MudText>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">@_data.GuiasRegistradas en almacén</MudText>
+                    </div>
+                    <MudAvatar Color="Color.Info" Variant="Variant.Filled" Size="Size.Large">
+                        <MudIcon Icon="@Icons.Material.Filled.LocalShipping" />
+                    </MudAvatar>
+                </div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" lg="3">
+            <MudPaper Elevation="2" Class="pa-5">
+                <div class="d-flex justify-space-between align-start">
+                    <div>
+                        <MudText Typo="Typo.overline" Class="mud-text-secondary">Entregadas</MudText>
+                        <MudText Typo="Typo.h3" Style="font-weight:800;">@_data.GuiasEntregadas</MudText>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">@_data.PesoTotalEntregado.ToString("N1") kg despachados</MudText>
+                    </div>
+                    <MudAvatar Color="Color.Success" Variant="Variant.Filled" Size="Size.Large">
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" />
+                    </MudAvatar>
+                </div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" lg="3">
+            <MudPaper Elevation="2" Class="pa-5">
+                <div class="d-flex justify-space-between align-start">
+                    <div>
+                        <MudText Typo="Typo.overline" Class="mud-text-secondary">Incidencias</MudText>
+                        <MudText Typo="Typo.h3" Style="font-weight:800;">@_data.TotalIncidencias</MudText>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">@_data.HojasActivas hojas activas</MudText>
+                    </div>
+                    <MudAvatar Color="Color.Warning" Variant="Variant.Filled" Size="Size.Large">
+                        <MudIcon Icon="@Icons.Material.Filled.ReportProblem" />
+                    </MudAvatar>
+                </div>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" lg="7">
+            <MudPaper Elevation="2" Class="pa-5" Style="height:100%;">
+                <div class="d-flex justify-space-between align-center mb-3">
+                    <MudText Typo="Typo.h6" Style="font-weight:700;">Últimas guías registradas</MudText>
+                    <MudButton Href="/guias" Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                               EndIcon="@Icons.Material.Filled.ArrowForward">Ver todas</MudButton>
+                </div>
+
+                @if (_data.UltimasGuias.Count == 0)
+                {
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary">Aún no hay guías registradas.</MudText>
+                }
+                else
+                {
+                    <MudSimpleTable Dense="true" Hover="true" Striped="true">
+                        <thead>
+                            <tr>
+                                <th>Código</th>
+                                <th>Cliente</th>
+                                <th>Destino</th>
+                                <th>Estado</th>
+                                <th>Fecha</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var guia in _data.UltimasGuias)
+                            {
+                                <tr style="cursor:pointer;" @onclick="@(() => AbrirGuia(guia.IdGuia))">
+                                    <td><b>@guia.CodigoGuia</b></td>
+                                    <td>@guia.Cliente</td>
+                                    <td>@guia.Destinatario</td>
+                                    <td><MudChip T="string" Size="Size.Small" Color="@ColorHito(guia.HitoActual)" Variant="Variant.Filled">@guia.HitoActual</MudChip></td>
+                                    <td>@guia.FechaRegistro.ToLocalTime().ToString("dd/MM/yy HH:mm")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" lg="5">
+            <MudPaper Elevation="2" Class="pa-5 mb-4">
+                <MudText Typo="Typo.h6" Style="font-weight:700;" Class="mb-3">Guías por hito</MudText>
+                @if (_data.GuiasPorHito.Count == 0)
+                {
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary">Sin datos.</MudText>
+                }
+                else
+                {
+                    @foreach (var item in _data.GuiasPorHito.OrderByDescending(g => g.Total))
+                    {
+                        var pct = _data.TotalGuias == 0 ? 0 : (int)Math.Round(item.Total * 100.0 / _data.TotalGuias);
+                        <div class="mb-3">
+                            <div class="d-flex justify-space-between">
+                                <MudText Typo="Typo.body2">@item.Etiqueta</MudText>
+                                <MudText Typo="Typo.body2"><b>@item.Total</b></MudText>
+                            </div>
+                            <MudProgressLinear Color="@ColorHito(item.Etiqueta)" Value="@pct" Rounded="true" Size="Size.Small" />
+                        </div>
+                    }
+                }
+            </MudPaper>
+
+            <MudPaper Elevation="2" Class="pa-5">
+                <div class="d-flex justify-space-between align-center mb-2">
+                    <MudText Typo="Typo.h6" Style="font-weight:700;">Notificaciones</MudText>
+                    <MudChip T="string" Size="Size.Small" Color="Color.Error">@_data.NotificacionesNoLeidas sin leer</MudChip>
+                </div>
+                @if (_data.UltimasNotificaciones.Count == 0)
+                {
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary">No hay notificaciones.</MudText>
+                }
+                else
+                {
+                    @foreach (var notif in _data.UltimasNotificaciones)
+                    {
+                        <div class="d-flex align-start gap-2 py-2" style="border-bottom:1px solid var(--mud-palette-lines-default);">
+                            <MudIcon Icon="@(notif.Leida ? Icons.Material.Outlined.NotificationsNone : Icons.Material.Filled.NotificationsActive)"
+                                     Color="@(notif.Leida ? Color.Default : Color.Primary)" Size="Size.Small" Class="mt-1" />
+                            <div style="flex:1;">
+                                <MudText Typo="Typo.body2">@notif.Mensaje</MudText>
+                                <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                    @notif.FechaHora.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                                </MudText>
+                            </div>
+                        </div>
+                    }
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12">
+            <MudPaper Elevation="2" Class="pa-5">
+                <MudText Typo="Typo.h6" Style="font-weight:700;" Class="mb-3">Indicadores rápidos</MudText>
+                <MudGrid>
+                    <MudItem xs="12" sm="4">
+                        <div class="d-flex align-center gap-3">
+                            <MudIcon Icon="@Icons.Material.Filled.DirectionsCar" Color="Color.Primary" Size="Size.Large" />
+                            <div>
+                                <MudText Typo="Typo.h5" Style="font-weight:700;">@_data.VehiculosDisponibles</MudText>
+                                <MudText Typo="Typo.caption" Class="mud-text-secondary">Vehículos disponibles</MudText>
+                            </div>
+                        </div>
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <div class="d-flex align-center gap-3">
+                            <MudIcon Icon="@Icons.Material.Filled.Route" Color="Color.Secondary" Size="Size.Large" />
+                            <div>
+                                <MudText Typo="Typo.h5" Style="font-weight:700;">@_data.HojasActivas</MudText>
+                                <MudText Typo="Typo.caption" Class="mud-text-secondary">Hojas de ruta activas</MudText>
+                            </div>
+                        </div>
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <div class="d-flex align-center gap-3">
+                            <MudIcon Icon="@Icons.Material.Filled.Schedule" Color="Color.Info" Size="Size.Large" />
+                            <div>
+                                <MudText Typo="Typo.h5" Style="font-weight:700;">@_data.PromedioHorasEntrega.ToString("N1") h</MudText>
+                                <MudText Typo="Typo.caption" Class="mud-text-secondary">Tiempo promedio de entrega</MudText>
+                            </div>
+                        </div>
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private DashboardDto? _data;
+    private bool _cargando = true;
+    private string _error = string.Empty;
+
+    protected override async Task OnInitializedAsync() => await CargarAsync();
+
+    private async Task CargarAsync()
+    {
+        _cargando = true;
+        try
+        {
+            _data = await Api.GetAsync<DashboardDto>("api/reportes/dashboard");
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    private void AbrirGuia(int id) => Nav.NavigateTo($"/guias/{id}");
+
+    private static Color ColorHito(string hito) => hito switch
+    {
+        Hitos.Entregado => Color.Success,
+        Hitos.EnTransito or Hitos.EnRepartoFinal => Color.Info,
+        Hitos.EnCentroDistribucion or Hitos.SalidaAlmacen => Color.Warning,
+        Hitos.Registrada => Color.Default,
+        _ => Color.Primary
+    };
+}

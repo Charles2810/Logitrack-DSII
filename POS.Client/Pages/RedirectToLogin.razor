@@ -1,0 +1,48 @@
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthProvider
+
+@if (_cargando)
+{
+    <MudContainer MaxWidth="MaxWidth.Small" Class="d-flex justify-center align-center" Style="min-height: 60vh;">
+        <MudProgressCircular Indeterminate="true" />
+    </MudContainer>
+}
+else if (!_autenticado)
+{
+    <MudContainer MaxWidth="MaxWidth.Small" Class="d-flex justify-center align-center" Style="min-height: 60vh;">
+        <MudProgressCircular Indeterminate="true" />
+    </MudContainer>
+}
+else
+{
+    <MudContainer MaxWidth="MaxWidth.Small" Class="my-10">
+        <MudPaper Elevation="2" Class="pa-8 text-center">
+            <MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Large" Color="Color.Error" />
+            <MudText Typo="Typo.h5" Class="mt-3">Acceso denegado</MudText>
+            <MudText Typo="Typo.body1" Class="mt-2 mud-text-secondary">
+                Su rol no tiene permisos para ver esta sección del sistema.
+            </MudText>
+            <MudButton Href="/" Variant="Variant.Filled" Color="Color.Primary" Class="mt-6">
+                Volver al inicio
+            </MudButton>
+        </MudPaper>
+    </MudContainer>
+}
+
+@code {
+    private bool _cargando = true;
+    private bool _autenticado;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthProvider.GetAuthenticationStateAsync();
+        _autenticado = state.User.Identity?.IsAuthenticated == true;
+        _cargando = false;
+
+        if (!_autenticado)
+        {
+            var destino = Nav.ToBaseRelativePath(Nav.Uri);
+            Nav.NavigateTo($"/login?returnUrl={Uri.EscapeDataString("/" + destino)}", replace: true);
+        }
+    }
+}

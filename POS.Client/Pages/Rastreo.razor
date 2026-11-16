@@ -1,0 +1,171 @@
+@page "/rastreo"
+@layout EmptyLayout
+@attribute [AllowAnonymous]
+@inject ApiClient Api
+@inject AuthenticationStateProvider AuthProvider
+@inject ISnackbar Snackbar
+
+<PageTitle>LogiTrack Solutions · Rastreo de envíos</PageTitle>
+
+<MudAppBar Elevation="2" Class="px-4">
+    <MudImage Src="logo.png" Alt="LogiTrack" Width="36" Height="36" Class="mr-2 rounded" />
+    <MudText Typo="Typo.h6" Style="font-weight:700;">LogiTrack Solutions</MudText>
+    <MudSpacer />
+    <MudButton Href="/login" Variant="Variant.Text" Color="Color.Inherit" StartIcon="@Icons.Material.Filled.Login">
+        Iniciar sesión
+    </MudButton>
+</MudAppBar>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-10 mb-8">
+    <MudPaper Elevation="3" Class="pa-6 pa-md-8">
+        <div class="d-flex flex-column align-center">
+            <MudIcon Icon="@Icons.Material.Filled.TravelExplore" Size="Size.Large" Color="Color.Primary" />
+            <MudText Typo="Typo.h4" Align="Align.Center" Class="mt-2">Rastree su envío</MudText>
+            <MudText Typo="Typo.body1" Align="Align.Center" Class="mud-text-secondary">
+                Ingrese el código de guía impreso en su comprobante (ej. LT-00000001).
+            </MudText>
+        </div>
+
+        <div class="d-flex gap-3 mt-6 flex-wrap">
+            <MudTextField @bind-Value="_codigo" Label="Código de guía" Variant="Variant.Outlined"
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.QrCode"
+                          Immediate="true" Class="flex-grow-1" OnKeyDown="OnKeyDown" />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large"
+                       OnClick="BuscarAsync" Disabled="_cargando" StartIcon="@Icons.Material.Filled.Search">
+                Rastrear
+            </MudButton>
+        </div>
+
+        @if (_cargando)
+        {
+            <div class="d-flex justify-center my-6">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <MudAlert Severity="Severity.Warning" Class="mt-5" Variant="Variant.Outlined">@_error</MudAlert>
+        }
+
+        @if (_resultado != null)
+        {
+            <MudDivider Class="my-6" />
+            <MudGrid>
+                <MudItem xs="12" sm="7">
+                    <MudText Typo="Typo.h5" Style="font-weight:700;">@_resultado.CodigoGuia</MudText>
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary">Estado actual del envío</MudText>
+                </MudItem>
+                <MudItem xs="12" sm="5" Class="d-flex justify-sm-end align-center">
+                    <MudChip T="string" Color="@ColorEstado(_resultado.EstadoActual)" Variant="Variant.Filled"
+                             Icon="@Icons.Material.Filled.Circle" Size="Size.Medium">
+                        @_resultado.EstadoActual
+                    </MudChip>
+                </MudItem>
+            </MudGrid>
+
+            <MudTimeline Class="mt-5" TimelineAlign="TimelineAlign.Start">
+                @foreach (var evento in _resultado.Eventos.OrderBy(e => e.OrdenHito).ThenBy(e => e.FechaHora))
+                {
+                    var ultimo = evento == _resultado.Eventos.OrderBy(e => e.OrdenHito).ThenBy(e => e.FechaHora).Last();
+                    <MudTimelineItem Color="@(ultimo ? Color.Primary : Color.Default)" Elevation="0"
+                                     Size="Size.Small" Variant="Variant.Filled">
+                        <ItemContent>
+                            <div class="d-flex justify-space-between align-center">
+                                <MudText Typo="Typo.subtitle1" Style="font-weight:600;">@evento.Hito</MudText>
+                                <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                    @evento.FechaHora.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                                </MudText>
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(evento.Estacion))
+                            {
+                                <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                                    <MudIcon Icon="@Icons.Material.Filled.Place" Size="Size.Small" Class="mr-1" />
+                                    @evento.Estacion
+                                </MudText>
+                            }
+                        </ItemContent>
+                    </MudTimelineItem>
+                }
+            </MudTimeline>
+        }
+
+        <MudDivider Class="my-6" />
+        <MudText Typo="Typo.caption" Class="mud-text-secondary" Align="Align.Center">
+            LogiTrack Solutions · Trazabilidad de envíos en tiempo real · La Paz, Bolivia
+        </MudText>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private string _codigo = string.Empty;
+    private bool _cargando;
+    private string? _error;
+    private TrazabilidadDto? _resultado;
+
+    [SupplyParameterFromQuery(Name = "codigo")]
+    public string? CodigoInicial { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthProvider.GetAuthenticationStateAsync();
+        var autenticado = state.User.Identity?.IsAuthenticated == true;
+
+        if (!string.IsNullOrWhiteSpace(CodigoInicial))
+        {
+            _codigo = CodigoInicial;
+            await BuscarAsync();
+        }
+        else if (autenticado)
+        {
+            Snackbar.Add("Vista pública de rastreo. Use el menú para volver al sistema.", Severity.Info);
+        }
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+        {
+            await BuscarAsync();
+        }
+    }
+
+    private async Task BuscarAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_codigo))
+        {
+            _error = "Ingrese un código de guía para continuar.";
+            return;
+        }
+
+        _cargando = true;
+        _error = null;
+        _resultado = null;
+
+        try
+        {
+            _resultado = await Api.GetAsync<TrazabilidadDto>($"api/tracking/{Uri.EscapeDataString(_codigo.Trim())}");
+            if (_resultado == null || _resultado.Eventos.Count == 0)
+            {
+                _error = "No se encontró información para el código indicado.";
+                _resultado = null;
+            }
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    private static Color ColorEstado(string estado) => estado switch
+    {
+        Hitos.Entregado => Color.Success,
+        Hitos.EnTransito or Hitos.EnRepartoFinal => Color.Info,
+        Hitos.EnCentroDistribucion or Hitos.SalidaAlmacen => Color.Warning,
+        _ => Color.Default
+    };
+}
