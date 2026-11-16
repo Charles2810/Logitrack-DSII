@@ -6,7 +6,12 @@
 **MATERIA:** Desarrollo de Sistemas II  
 **PROYECTO:** LogiTrack Solutions — Sistema de Gestión y Trazabilidad Logística  
 **DOCENTE:** Lic./Ing. Titular de Materia  
-**ESTUDIANTE / GRUPO:** Charles  
+**ESTUDIANTE / GRUPO:** 
+Diego Andrés Fernández Romero
+Sebastián Zamorano Blanco
+Charles Yourdan Conde Ugarteche
+Yenny Serrudo Peña
+Humberto Joel López Paz  
 **FECHA:** Gestión 2026  
 
 ---
