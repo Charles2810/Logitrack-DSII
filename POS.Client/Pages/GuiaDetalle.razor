@@ -41,7 +41,7 @@ else
         </div>
         <div class="d-flex gap-2 flex-wrap">
             <MudButton Variant="Variant.Outlined" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.TravelExplore"
-                       Href="@($"/rastreo?codigo={_guia.CodigoGuia}")">Rastreo</MudButton>
+                       Href="@($"/rastreo-interno?codigo={_guia.CodigoGuia}")">Rastreo</MudButton>
 
             <AuthorizeView Roles="@Roles.AdministradorLogistico" Context="adminLog">
                 <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Edit"

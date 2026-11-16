@@ -1,0 +1,19 @@
+@page "/rastreo-interno"
+@attribute [Authorize]
+
+<PageTitle>LogiTrack Solutions · Rastreo de envíos</PageTitle>
+
+<div class="d-flex justify-space-between align-center flex-wrap gap-3 mb-4">
+    <div>
+        <MudText Typo="Typo.h4" Style="font-weight:800;">Rastreo público</MudText>
+        <MudText Typo="Typo.body1" Class="mud-text-secondary">
+            Consulte el estado de una guía sin salir del sistema.
+        </MudText>
+    </div>
+    <MudButton Href="/" Variant="Variant.Outlined" Color="Color.Primary"
+               StartIcon="@Icons.Material.Filled.SpaceDashboard">
+        Volver al panel
+    </MudButton>
+</div>
+
+<RastreoTracker />

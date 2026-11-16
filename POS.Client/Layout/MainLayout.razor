@@ -23,7 +23,7 @@
 
         <MudTooltip Text="Rastreo público">
             <MudIconButton Icon="@Icons.Material.Filled.TravelExplore" Color="Color.Inherit"
-                           Href="/rastreo?publico=true" />
+                           Href="/rastreo-interno" />
         </MudTooltip>
 
         <MudTooltip Text="Notificaciones">
@@ -38,23 +38,41 @@
                             Color="Color.Inherit" ToggledIcon="@Icons.Material.Filled.LightMode"
                             ToggledColor="Color.Warning" />
 
-        <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
-            <ActivatorContent>
-                <MudButton Variant="Variant.Text" Color="Color.Inherit" Class="ml-2" EndIcon="@Icons.Material.Filled.ArrowDropDown">
-                    <MudAvatar Color="Color.Secondary" Size="Size.Small" Class="mr-2" Style="font-weight:700;">
-                        @Iniciales
-                    </MudAvatar>
-                    <div class="d-flex flex-column align-start" style="line-height: 1.1;">
-                        <span style="font-size: .85rem;">@_nombre</span>
-                        <span style="font-size: .70rem; opacity: .8;">@_rol</span>
+        <div style="position: relative;">
+            <MudButton Variant="Variant.Text" Color="Color.Inherit" Class="ml-2" EndIcon="@Icons.Material.Filled.ArrowDropDown"
+                       OnClick="@(() => _menuUsuarioAbierto = !_menuUsuarioAbierto)">
+                <MudAvatar Color="Color.Secondary" Size="Size.Small" Class="mr-2" Style="font-weight:700;">
+                    @Iniciales
+                </MudAvatar>
+                <div class="d-flex flex-column align-start" style="line-height: 1.1;">
+                    <span style="font-size: .85rem;">@_nombre</span>
+                    <span style="font-size: .70rem; opacity: .8;">@_rol</span>
+                </div>
+            </MudButton>
+
+            @if (_menuUsuarioAbierto)
+            {
+                <div style="position: fixed; inset: 0; z-index: 1400;" @onclick="CerrarMenuUsuario"></div>
+                <div style="position: absolute; top: calc(100% + 8px); right: 0; min-width: 260px; z-index: 1500;
+                            background: var(--mud-palette-surface); color: var(--mud-palette-text-primary);
+                            border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.28); padding: 8px;">
+                    <div class="px-2 py-2 d-flex align-center">
+                        <MudAvatar Color="Color.Secondary" Class="mr-3" Style="font-weight:700;">@Iniciales</MudAvatar>
+                        <div class="d-flex flex-column" style="line-height: 1.2;">
+                            <MudText Typo="Typo.subtitle2" Style="font-weight: 700;">@_nombre</MudText>
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary">@_rol</MudText>
+                        </div>
                     </div>
-                </MudButton>
-            </ActivatorContent>
-            <ChildContent>
-                <MudMenuItem Href="/perfil" Icon="@Icons.Material.Filled.ManageAccounts">Mi perfil</MudMenuItem>
-                <MudMenuItem OnClick="CerrarSesion" Icon="@Icons.Material.Filled.Logout">Cerrar sesión</MudMenuItem>
-            </ChildContent>
-        </MudMenu>
+                    <MudDivider Class="my-1" />
+                    <MudButton Variant="Variant.Text" Color="Color.Default" StartIcon="@Icons.Material.Filled.ManageAccounts"
+                               FullWidth="true" Class="justify-start" OnClick="IrAPerfil">Mi perfil</MudButton>
+                    <div class="mt-1">
+                        <MudButton Variant="Variant.Filled" Color="Color.Error" StartIcon="@Icons.Material.Filled.Logout"
+                                   FullWidth="true" OnClick="CerrarSesion">Cerrar sesión</MudButton>
+                    </div>
+                </div>
+            }
+        </div>
     </MudAppBar>
 
     <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="1">
@@ -70,6 +88,7 @@
 
 @code {
     private bool _drawerOpen = true;
+    private bool _menuUsuarioAbierto;
     private bool _isDark;
     private string _nombre = "Usuario";
     private string _rol = string.Empty;
@@ -154,6 +173,7 @@
 
     private async void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
+        _menuUsuarioAbierto = false;
         await ActualizarNotificacionesAsync();
         StateHasChanged();
     }
@@ -165,10 +185,19 @@
         Nav.NavigateTo("/login");
     }
 
+    private void CerrarMenuUsuario() => _menuUsuarioAbierto = false;
+
+    private void IrAPerfil()
+    {
+        _menuUsuarioAbierto = false;
+        Nav.NavigateTo("/perfil");
+    }
+
     private async Task CerrarSesion()
     {
+        _menuUsuarioAbierto = false;
         await JwtAuth.SignOutAsync();
-        Nav.NavigateTo("/login");
+        Nav.NavigateTo("/login", forceLoad: true);
     }
 
     public void Dispose()
