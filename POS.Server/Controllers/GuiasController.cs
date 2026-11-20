@@ -229,14 +229,33 @@ public class GuiasController : ControllerBase
             throw new BusinessException("No puede repetir el mismo producto en el detalle de la guía.");
         }
 
-        var productosExistentes = await _context.Productos
-            .Where(p => idsProductos.Contains(p.IdProducto))
-            .Select(p => p.IdProducto)
-            .ToListAsync();
+        var almacenExiste = await _context.Almacenes
+            .AnyAsync(a => a.IdAlmacen == request.IdAlmacenOrigen);
+        if (!almacenExiste)
+        {
+            throw new BusinessException("El almacén de origen seleccionado no existe.", 404);
+        }
 
-        if (productosExistentes.Count != idsProductos.Count)
+        var productos = await _context.Productos
+            .Where(p => idsProductos.Contains(p.IdProducto))
+            .ToDictionaryAsync(p => p.IdProducto, p => p.Sku);
+
+        if (productos.Count != idsProductos.Count)
         {
             throw new BusinessException("Uno o más productos seleccionados no existen.");
+        }
+
+        var stocks = await _context.Inventarios
+            .Where(i => i.IdAlmacen == request.IdAlmacenOrigen && idsProductos.Contains(i.IdProducto))
+            .ToDictionaryAsync(i => i.IdProducto, i => i.StockActual);
+
+        foreach (var detalle in request.Detalles)
+        {
+            var disponible = stocks.GetValueOrDefault(detalle.IdProducto);
+            if (detalle.Cantidad > disponible)
+            {
+                throw new BusinessException($"Stock insuficiente en el almacén de origen para el producto {productos[detalle.IdProducto]}: disponible {disponible}, requerido {detalle.Cantidad}.");
+            }
         }
 
         var idRegistrada = await _context.Hitos

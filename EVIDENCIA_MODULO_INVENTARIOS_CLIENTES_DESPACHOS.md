@@ -59,7 +59,7 @@ Todas usan `DialogService.ShowMessageBoxAsync` con botones **Sí / No**.
 |---|---|---|---|
 | Clientes | `GET/POST/PUT /api/clientes`, `DELETE /api/clientes/{id}` | `DELETE` → `404` si no existe; `409` si tiene `GuiaEnvio`. Roles: Admin Sistema + Admin Logístico | `POS.Server/Controllers/ClientesController.cs:92,99` |
 | Productos | `GET/POST/PUT /api/productos`, `DELETE /api/productos/{id}` | `DELETE` → `409` si existe `Inventario`, `MovimientoInventario` o `DetalleGuia` | `POS.Server/Controllers/ProductosController.cs:89,96-98` |
-| Guías | `GET/POST/PUT`, `PATCH /{id}/hoja-ruta`, `DELETE /{id}` | Alta solo Admin Logístico; `DELETE` exige hito `Registrada` y sin checkpoints, incidencias, entregas, movimientos ni notificaciones | `POS.Server/Controllers/GuiasController.cs:365,388,398-407` |
+| Guías | `GET/POST/PUT`, `PATCH /{id}/hoja-ruta`, `DELETE /{id}` | Alta solo Admin Logístico y valida stock del almacén de origen por producto; `DELETE` exige hito `Registrada` y sin checkpoints, incidencias, entregas, movimientos ni notificaciones | `POS.Server/Controllers/GuiasController.cs:232-275,384,407,417-426` |
 | Inventario | `GET /api/inventario`, `GET /alertas`, `GET /movimientos`, `POST /movimientos` | Stock por almacén+producto; tipo solo `ENTRADA`/`SALIDA`; RN14 impide stock negativo | `POS.Server/Controllers/InventarioController.cs:25,58,77,134` |
 | Checkpoints | `POST /api/checkpoints` | Hito siguiente (+1), guía asignada, hoja no finalizada, RN13 por rol; dispara descuento automático | `POS.Server/Controllers/CheckpointsController.cs:35-133` |
 | Incidencias | `POST /api/incidencias` | Requiere descripción y foto; solo conductor/supervisor de su ruta | `POS.Server/Controllers/IncidenciasController.cs:94` |
@@ -78,8 +78,8 @@ Respuestas de error: contrato `ApiError { codigo, mensaje, detalle, traza }`. Lo
 
 - Cada `SaveChangesAsync()` se ejecuta dentro de una transacción de EF Core.
 - Transacciones **explícitas** donde hay más de un `SaveChangesAsync()`:
-  - Reemplazo de detalle de guía: `POS.Server/Controllers/GuiasController.cs:336-352`.
-  - Baja de guía: elimina `DetalleGuia` y luego `GuiaEnvio`, con `CommitAsync()`: `POS.Server/Controllers/GuiasController.cs:412-419`.
+  - Reemplazo de detalle de guía: `POS.Server/Controllers/GuiasController.cs:355-371`.
+  - Baja de guía: elimina `DetalleGuia` y luego `GuiaEnvio`, con `CommitAsync()`: `POS.Server/Controllers/GuiasController.cs:431-438`.
   - Checkpoint de salida + movimientos + descuento: `POS.Server/Controllers/CheckpointsController.cs:112-133`.
 
 ### 5.2 Descuento automático al salir el camión

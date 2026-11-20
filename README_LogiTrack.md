@@ -298,8 +298,8 @@ Las reglas se validan en SQL Server; la API traduce los errores a mensajes claro
 - Al registrar el checkpoint **Salida de Almacén** (`CheckpointsController.cs:85-133`) se generan automáticamente los movimientos `SALIDA` del almacén de origen por cada producto del detalle de la guía. El checkpoint, los movimientos y el descuento de stock se confirman juntos con `CommitAsync()`; si falta stock, no se registra ni el checkpoint. No registrar además un movimiento manual `SALIDA` para esa guía, porque duplicaría el descuento.
 - Los trigger de hito, notificaciones y eventos también se ejecutan en la misma transacción de la petición. `trg_guia_envio_asigna_notifica` avisa al conductor cuando su guía pasa de `Sin asignar` a una hoja de ruta (`database.sql:651-670`).
 - Cuando una operación escribe en varias tablas con más de un `SaveChangesAsync()`, se usa una transacción explícita:
-  - `GuiasController.cs:336-352`: reemplazo del detalle de la guía (RN05/RNF05).
-  - `GuiasController.cs:412-419`: baja de la guía; primero elimina `detalle_guia` y luego la guía, con `CommitAsync()` al final.
+  - `GuiasController.cs:355-371`: reemplazo del detalle de la guía (RN05/RNF05).
+  - `GuiasController.cs:431-438`: baja de la guía; primero elimina `detalle_guia` y luego la guía, con `CommitAsync()` al final.
 - Las bajas de cliente y producto validan las FK antes de borrar y devuelven `409` si el registro está referenciado, evitando estados parciales.
 
 ---

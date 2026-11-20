@@ -110,4 +110,5 @@ El trigger `trg_movimiento_inventario` aplicó el cambio de stock dentro de la m
 - Si una petición devuelve **401**, volver a ejecutar `Login - Administrador Logístico (Ana)`.
 - El token `tokenAdminLogistico` tiene permisos para clientes, productos, guías e inventario.
 - No repetir `Eliminar producto` sobre IDs con stock, movimientos o detalles: el **409** es el comportamiento correcto.
+- Crear una guía con cantidad mayor al stock del almacén de origen devuelve **400** con `Stock insuficiente ...`, tanto en Postman como en el formulario `GuiaDialog`.
 - La evidencia documental completa está en `PRODUCTO_FORMULARIOS_CONTROLADORES_TRANSACCIONES_CRUD.md` y `EVIDENCIA_MODULO_INVENTARIOS_CLIENTES_DESPACHOS.md`.

@@ -125,6 +125,7 @@
         catch (ApiException ex)
         {
             _error = ex.Message;
+            Snackbar.Add(_error, Severity.Error);
         }
         finally
         {

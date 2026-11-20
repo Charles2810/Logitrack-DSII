@@ -261,6 +261,19 @@
             return;
         }
 
+        var inventario = await Api.GetAsync<List<InventarioDto>>($"api/inventario?idAlmacen={_idAlmacen}") ?? new();
+        foreach (var detalle in detalles)
+        {
+            var disponible = inventario.FirstOrDefault(i => i.IdProducto == detalle.IdProducto)?.StockActual ?? 0;
+            if (detalle.Cantidad > disponible)
+            {
+                var producto = _cat.Productos.FirstOrDefault(p => p.IdProducto == detalle.IdProducto);
+                _error = $"Stock insuficiente para {producto?.Sku ?? "el producto"}: disponible {disponible}, requerido {detalle.Cantidad}.";
+                Snackbar.Add(_error, Severity.Error);
+                return;
+            }
+        }
+
         var peso = _peso;
         var volumen = _volumen;
         if (_autoCalcular)
@@ -332,10 +345,12 @@
         catch (ApiException ex)
         {
             _error = ex.Message;
+            Snackbar.Add(_error, Severity.Error);
         }
         catch (Exception ex)
         {
             _error = "No se pudo guardar la guía: " + ex.Message;
+            Snackbar.Add(_error, Severity.Error);
         }
         finally
         {

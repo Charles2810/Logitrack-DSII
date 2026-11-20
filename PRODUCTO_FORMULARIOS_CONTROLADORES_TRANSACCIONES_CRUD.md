@@ -64,7 +64,7 @@ Leyenda de roles (`POS.Shared/Constants/Roles.cs:7-13`): **AS** Administrador de
 |---|---|---|---|---|
 | Clientes | `GET/POST/PUT` `ClientesController.cs:24,48,71`; `DELETE :92` | Auth / AS+AL | 404 si no existe (`:80,96`); 409 si tiene guías (`:99-102`) | `Save` `:66,88,105` |
 | Productos | `GET/POST/PUT` `ProductosController.cs:24,45,68`; `DELETE :89` | Auth / AS+AL | SKU upper `:56`; 404 `:77,93`; 409 si hay stock, movimientos o detalles (`:96-101`) | `Save` `:63,85,104` |
-| Guías | `GET/POST/PUT/PATCH/DELETE` `GuiasController.cs:24,212,290,365,388` | Auth con ámbito / AL | Detalle ≥1, sin duplicados, productos existen, hito `Registrada`; 404/409 (`:216-257,299-334,369-410`) | `Save` `:280,356,380`; **Tx** `:336-352`, `:412-419` |
+| Guías | `GET/POST/PUT/PATCH/DELETE` `GuiasController.cs:24,212,309,384,407` | Auth con ámbito / AL | Detalle ≥1, sin duplicados, productos existen, almacén existe, stock suficiente en origen, hito `Registrada`; 400/404/409 (`:216-275,318-352,393-396,417-429`) | `Save` `:299,375,399`; **Tx** `:355-371`, `:431-438` |
 | Inventario | `GET/POST` `InventarioController.cs:24,57,77,134` | Auth / PA+AL+AS | Tipo `ENTRADA`/`SALIDA`; 404 almacén/producto/guía (`:143-161`); stock lo valida el trigger RN14 | `Save` `:174` |
 | Checkpoints | `GET/POST` `CheckpointsController.cs:24,35` | Auth con ámbito / C+PA | Hito siguiente RN05, guía asignada, hoja activa, conductor asignado RN13, stock suficiente (`:44-101`) | **Tx** `:112-133` |
 | Incidencias | `POST IncidenciasController.cs:70` | C+CC | Foto obligatoria RN08 (validación UI y API) | `Save` |
@@ -84,8 +84,8 @@ Solo hay tres bloques con transacción explícita; en todos se usa `await using`
 
 | Operación | Inicio | Saves | Commit | Objetivo |
 |---|---|---|---|---|
-| Editar guía y reemplazar detalle | `GuiasController.cs:336` | `:339,351` | `:352` | Evitar guía con detalle viejo + nuevo a medias |
-| Eliminar guía | `GuiasController.cs:412` | `:415,418` | `:419` | Borrar `DetalleGuia` y `GuiaEnvio` juntos |
+| Editar guía y reemplazar detalle | `GuiasController.cs:355` | `:358,370` | `:371` | Evitar guía con detalle viejo + nuevo a medias |
+| Eliminar guía | `GuiasController.cs:431` | `:434,437` | `:438` | Borrar `DetalleGuia` y `GuiaEnvio` juntos |
 | Checkpoint de salida | `CheckpointsController.cs:112` | `:132` | `:133` | Checkpoint + movimientos `SALIDA` + descuento de stock atómicos |
 
 El resto de mutaciones usan una sola llamada `SaveChangesAsync()`, que EF Core ejecuta dentro de su propia transacción implícita.
@@ -122,11 +122,11 @@ Al registrar `Salida de Almacén` (`Hitos.SalidaAlmacen`):
 | Alta de cliente | `ClienteDialog` | `POST /api/clientes` | Implícita | `INSERT dbo.cliente` |
 | Alta de producto | `ProductoDialog` | `POST /api/productos` | Implícita | `INSERT dbo.producto` |
 | Movimiento manual | `MovimientoDialog` | `POST /api/inventario/movimientos` | Implícita | `INSERT movimiento_inventario` + trigger ajusta `inventario.stock_actual` |
-| Alta de guía | `GuiaDialog` | `POST /api/guias` | Implícita | `INSERT guia_envio` + `detalle_guia`; notifica si nace asignada |
+| Alta de guía | `GuiaDialog` | `POST /api/guias` | Implícita | Valida stock en origen; `INSERT guia_envio` + `detalle_guia`; notifica si nace asignada |
 | Asignar hoja | `AsignarHojaDialog` | `PATCH /api/guias/{id}/hoja-ruta` | Implícita | Actualiza `id_hoja_ruta` + trigger de notificación |
-| Editar detalle de guía | `GuiaDialog` (edición) | `PUT /api/guias/{id}` | **Explícita** `GuiasController.cs:336-352` | `DELETE/INSERT detalle_guia` atómico |
+| Editar detalle de guía | `GuiaDialog` (edición) | `PUT /api/guias/{id}` | **Explícita** `GuiasController.cs:355-371` | `DELETE/INSERT detalle_guia` atómico |
 | Salida de camión | `CheckpointDialog` | `POST /api/checkpoints` | **Explícita** `CheckpointsController.cs:112-133` | `INSERT checkpoint` + `movimientos SALIDA` + descuento atómico |
-| Baja de guía | `Guias.razor Delete` | `DELETE /api/guias/{id}` | **Explícita** `GuiasController.cs:412-419` | `DELETE detalle_guia` + `guia_envio` atómico |
+| Baja de guía | `Guias.razor Delete` | `DELETE /api/guias/{id}` | **Explícita** `GuiasController.cs:431-438` | `DELETE detalle_guia` + `guia_envio` atómico |
 | Inhabilitar vehículo | `Flota.razor Delete` | `PATCH /api/vehiculos/{id}/estado` | Implícita | Update de estado validado por trigger |
 
 ---
