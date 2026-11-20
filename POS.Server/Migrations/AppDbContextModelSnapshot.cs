@@ -562,6 +562,10 @@ namespace POS.Server.Migrations
                         .HasColumnType("int")
                         .HasColumnName("id_guia");
 
+                    b.Property<int?>("IdHojaRuta")
+                        .HasColumnType("int")
+                        .HasColumnName("id_hoja_ruta");
+
                     b.Property<int>("IdUsuario")
                         .HasColumnType("int")
                         .HasColumnName("id_usuario");
@@ -587,6 +591,8 @@ namespace POS.Server.Migrations
                     b.HasKey("IdNotificacion");
 
                     b.HasIndex("IdGuia");
+
+                    b.HasIndex("IdHojaRuta");
 
                     b.HasIndex("IdUsuario");
 
@@ -1171,6 +1177,11 @@ namespace POS.Server.Migrations
                         .HasForeignKey("IdGuia")
                         .OnDelete(DeleteBehavior.NoAction);
 
+                    b.HasOne("POS.Shared.Entities.HojaRuta", "HojaRuta")
+                        .WithMany()
+                        .HasForeignKey("IdHojaRuta")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("POS.Shared.Entities.Usuario", "Usuario")
                         .WithMany()
                         .HasForeignKey("IdUsuario")
@@ -1178,6 +1189,8 @@ namespace POS.Server.Migrations
                         .IsRequired();
 
                     b.Navigation("Guia");
+
+                    b.Navigation("HojaRuta");
 
                     b.Navigation("Usuario");
                 });

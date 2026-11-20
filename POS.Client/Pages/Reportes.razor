@@ -56,10 +56,6 @@
             <MudDatePicker @bind-Date="_hasta" Label="Hasta" Variant="Variant.Outlined" Editable="true"
                            @bind-Date:after="BuscarAsync" />
         </MudItem>
-        <MudItem xs="12" md="1" Class="d-flex align-center">
-            <MudSwitch @bind-Value="_conIncidencias" @bind-Value:after="BuscarAsync" Color="Color.Warning"
-                       Label="Solo con incidencias" LabelPlacement="Placement.Start" />
-        </MudItem>
         <MudItem xs="12" Class="d-flex gap-3 align-center flex-wrap">
             <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.FilterAlt"
                        OnClick="BuscarAsync">Aplicar filtros</MudButton>
@@ -67,6 +63,8 @@
             <MudText Typo="Typo.caption" Class="mud-text-secondary">
                 Mostrando @_items.Count registro(s) · máximo 500 por consulta.
             </MudText>
+            <MudSwitch @bind-Value="_conIncidencias" @bind-Value:after="BuscarAsync" Color="Color.Warning"
+                       Label="Solo con incidencias" Class="ml-auto" />
         </MudItem>
     </MudGrid>
 </MudPaper>

@@ -2,6 +2,7 @@
 @attribute [Authorize(Roles = "Administrador del Sistema,Administrador Logístico,Personal de Almacén")]
 @inject ApiClient Api
 @inject CatalogosService Catalogos
+@inject IDialogService DialogService
 @inject ISnackbar Snackbar
 
 <PageTitle>LogiTrack Solutions · Movimientos de inventario</PageTitle>
@@ -15,6 +16,12 @@
         <MudText Typo="Typo.body2" Class="mud-text-secondary">
             Historial de entradas y salidas de stock por almacén.
         </MudText>
+    </div>
+    <div class="d-flex gap-2">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.SwapVert"
+                   Href="/inventario/movimientos">Ver movimientos</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="NuevoMovimientoAsync">Registrar movimiento</MudButton>
     </div>
 </div>
 
@@ -177,5 +184,23 @@
         _desde = null;
         _hasta = null;
         await BuscarAsync();
+    }
+
+    private async Task NuevoMovimientoAsync()
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(MovimientoDialog.IdAlmacenInicial), _idAlmacen },
+            { nameof(MovimientoDialog.IdProductoInicial), _idProducto }
+        };
+
+        var dialog = await DialogService.ShowAsync<MovimientoDialog>("Registrar movimiento", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true });
+
+        if ((await dialog.Result) is { Canceled: false })
+        {
+            Catalogos.Invalidar();
+            await BuscarAsync();
+        }
     }
 }

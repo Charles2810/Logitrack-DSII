@@ -1,0 +1,149 @@
+@page "/inventario/productos"
+@attribute [Authorize(Roles = "Administrador del Sistema,Administrador Logístico,Personal de Almacén")]
+@inject ApiClient Api
+@inject CatalogosService Catalogos
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>LogiTrack Solutions · Productos</PageTitle>
+
+<div class="d-flex justify-space-between align-center flex-wrap gap-3 mb-4">
+    <div>
+        <MudText Typo="Typo.h4" Style="font-weight:800;">Productos</MudText>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">
+            Catálogo de productos, pesos y volúmenes unitarios.
+        </MudText>
+    </div>
+    <AuthorizeView Context="auth" Roles="@($"{Roles.AdministradorSistema},{Roles.AdministradorLogistico}")">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="NuevoAsync">Nuevo producto</MudButton>
+    </AuthorizeView>
+</div>
+
+<MudPaper Elevation="2" Class="pa-4 mb-4">
+    <MudTextField @bind-Value="_buscar" Label="Buscar SKU o nombre" Variant="Variant.Outlined"
+                  Immediate="true" Adornment="Adornment.Start"
+                  AdornmentIcon="@Icons.Material.Filled.Search" DebounceInterval="400"
+                  OnDebounceIntervalElapsed="@(_ => CargarAsync())" Style="min-width:280px;" />
+</MudPaper>
+
+<MudPaper Elevation="2">
+    <MudTable Items="_items" Loading="_cargando" Dense="true" Hover="true" Striped="true" Breakpoint="Breakpoint.Sm">
+        <HeaderContent>
+            <MudTh>SKU</MudTh>
+            <MudTh>Producto</MudTh>
+            <MudTh align="Right">Peso unitario (kg)</MudTh>
+            <MudTh align="Right">Volumen unitario (m³)</MudTh>
+            <AuthorizeView Context="auth" Roles="@($"{Roles.AdministradorSistema},{Roles.AdministradorLogistico}")">
+                <MudTh align="Right">Acciones</MudTh>
+            </AuthorizeView>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd><b>@context.Sku</b></MudTd>
+            <MudTd>@context.Nombre</MudTd>
+            <MudTd align="Right">@context.PesoUnitarioKg.ToString("N3")</MudTd>
+            <MudTd align="Right">@context.VolumenUnitarioM3.ToString("N4")</MudTd>
+            <AuthorizeView Context="auth" Roles="@($"{Roles.AdministradorSistema},{Roles.AdministradorLogistico}")">
+                <MudTd align="Right">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
+                                   title="Editar producto" OnClick="@(() => EditarAsync(context))" />
+                    <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Error"
+                               OnClick="@(() => EliminarAsync(context))">Delete</MudButton>
+                </MudTd>
+            </AuthorizeView>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Typo="Typo.body2" Class="mud-text-secondary py-4">No hay productos registrados.</MudText>
+        </NoRecordsContent>
+    </MudTable>
+</MudPaper>
+
+@code {
+    private List<ProductoDto> _items = new();
+    private string? _buscar;
+    private bool _cargando = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarAsync();
+    }
+
+    private async Task CargarAsync()
+    {
+        _cargando = true;
+        try
+        {
+            var url = "api/productos";
+            if (!string.IsNullOrWhiteSpace(_buscar))
+            {
+                url += $"?buscar={Uri.EscapeDataString(_buscar.Trim())}";
+            }
+
+            _items = await Api.GetAsync<List<ProductoDto>>(url) ?? new();
+        }
+        catch (ApiException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    private async Task NuevoAsync()
+    {
+        var parameters = new DialogParameters { { nameof(ProductoDialog.Edicion), false } };
+        var dialog = await DialogService.ShowAsync<ProductoDialog>("Nuevo producto", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true });
+
+        if ((await dialog.Result) is { Canceled: false })
+        {
+            Catalogos.Invalidar();
+            await CargarAsync();
+        }
+    }
+
+    private async Task EditarAsync(ProductoDto producto)
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(ProductoDialog.Producto), producto },
+            { nameof(ProductoDialog.Edicion), true }
+        };
+
+        var dialog = await DialogService.ShowAsync<ProductoDialog>("Editar producto", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true });
+
+        if ((await dialog.Result) is { Canceled: false })
+        {
+            Catalogos.Invalidar();
+            await CargarAsync();
+        }
+    }
+
+    private async Task EliminarAsync(ProductoDto producto)
+    {
+        var confirmar = await DialogService.ShowMessageBoxAsync(
+            "Eliminar producto",
+            $"¿Desea eliminar el producto {producto.Sku} · {producto.Nombre}? Esta acción no se puede deshacer.",
+            yesText: "Sí", cancelText: "No");
+
+        if (confirmar != true)
+        {
+            return;
+        }
+
+        try
+        {
+            await Api.DeleteAsync<object>($"api/productos/{producto.IdProducto}");
+            Catalogos.Invalidar();
+            Snackbar.Add("Producto eliminado.", Severity.Success);
+            await CargarAsync();
+        }
+        catch (ApiException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+}

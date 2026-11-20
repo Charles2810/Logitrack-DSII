@@ -62,9 +62,10 @@
             <MudTd align="Right">
                 @if (!string.IsNullOrWhiteSpace(context.RutaFoto))
                 {
-                    <MudImage Src="@context.RutaFoto" Width="64" Height="48" Class="rounded"
-                              ObjectFit="ObjectFit.Cover" Style="cursor:zoom-in;"
-                              @onclick="@(() => AbrirImagen(context.RutaFoto))" />
+                    <MudTooltip Text="Ver evidencia">
+                        <MudIconButton Icon="@Icons.Material.Filled.Image" Color="Color.Primary" Size="Size.Small"
+                                       OnClick="@(() => AbrirImagen(context.RutaFoto))" />
+                    </MudTooltip>
                 }
                 else
                 {

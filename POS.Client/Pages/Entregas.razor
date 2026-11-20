@@ -43,17 +43,15 @@
                     @if (!string.IsNullOrWhiteSpace(context.RutaFirma))
                     {
                         <MudTooltip Text="Ver firma">
-                            <MudImage Src="@context.RutaFirma" Width="56" Height="42" Class="rounded"
-                                      ObjectFit="ObjectFit.Contain" Style="cursor:zoom-in;"
-                                      @onclick="@(() => AbrirImagen(context.RutaFirma))" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Draw" Color="Color.Primary" Size="Size.Small"
+                                           OnClick="@(() => AbrirImagen(context.RutaFirma))" />
                         </MudTooltip>
                     }
                     @if (!string.IsNullOrWhiteSpace(context.RutaFoto))
                     {
                         <MudTooltip Text="Ver fotografía">
-                            <MudImage Src="@context.RutaFoto" Width="56" Height="42" Class="rounded"
-                                      ObjectFit="ObjectFit.Cover" Style="cursor:zoom-in;"
-                                      @onclick="@(() => AbrirImagen(context.RutaFoto))" />
+                            <MudIconButton Icon="@Icons.Material.Filled.PhotoCamera" Color="Color.Primary" Size="Size.Small"
+                                           OnClick="@(() => AbrirImagen(context.RutaFoto))" />
                         </MudTooltip>
                     }
                     @if (string.IsNullOrWhiteSpace(context.RutaFirma) && string.IsNullOrWhiteSpace(context.RutaFoto))

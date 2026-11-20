@@ -477,6 +477,7 @@ namespace POS.Server.Migrations
                         .Annotation("SqlServer:Identity", "1, 1"),
                     id_usuario = table.Column<int>(type: "int", nullable: false),
                     id_guia = table.Column<int>(type: "int", nullable: true),
+                    id_hoja_ruta = table.Column<int>(type: "int", nullable: true),
                     tipo = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: false),
                     mensaje = table.Column<string>(type: "nvarchar(300)", maxLength: 300, nullable: false),
                     leida = table.Column<bool>(type: "bit", nullable: false, defaultValue: false),
@@ -491,6 +492,12 @@ namespace POS.Server.Migrations
                         principalSchema: "dbo",
                         principalTable: "guia_envio",
                         principalColumn: "id_guia");
+                    table.ForeignKey(
+                        name: "FK_notificacion_hoja_ruta_id_hoja_ruta",
+                        column: x => x.id_hoja_ruta,
+                        principalSchema: "dbo",
+                        principalTable: "hoja_ruta",
+                        principalColumn: "id_hoja_ruta");
                     table.ForeignKey(
                         name: "FK_notificacion_usuario_id_usuario",
                         column: x => x.id_usuario,
@@ -685,6 +692,12 @@ namespace POS.Server.Migrations
                 schema: "dbo",
                 table: "notificacion",
                 column: "id_guia");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_notificacion_id_hoja_ruta",
+                schema: "dbo",
+                table: "notificacion",
+                column: "id_hoja_ruta");
 
             migrationBuilder.CreateIndex(
                 name: "IX_notificacion_id_usuario",
