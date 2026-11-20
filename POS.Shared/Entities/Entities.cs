@@ -397,6 +397,9 @@ public class Notificacion
     [Column("id_guia")]
     public int? IdGuia { get; set; }
 
+    [Column("id_hoja_ruta")]
+    public int? IdHojaRuta { get; set; }
+
     [Column("tipo")]
     public string Tipo { get; set; } = string.Empty;
 
@@ -411,6 +414,7 @@ public class Notificacion
 
     public Usuario? Usuario { get; set; }
     public GuiaEnvio? Guia { get; set; }
+    public HojaRuta? HojaRuta { get; set; }
 }
 
 // Las vistas se mapean como entidades sin clave en AppDbContext.

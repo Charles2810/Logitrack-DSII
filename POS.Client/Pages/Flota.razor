@@ -52,6 +52,9 @@
                     <MudTd align="Right">
                         <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
                                        title="Editar vehículo" OnClick="@(() => EditarVehiculoAsync(context))" />
+                        <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Error"
+                                   Disabled="@(context.Estado == Estados.VehiculoInhabilitado)"
+                                   OnClick="@(() => InhabilitarVehiculoAsync(context))">Delete</MudButton>
                     </MudTd>
                 </RowTemplate>
                 <NoRecordsContent>
@@ -87,6 +90,8 @@
                     <MudTd align="Right">
                         <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
                                        title="Editar producto" OnClick="@(() => EditarProductoAsync(context))" />
+                        <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Error"
+                                   OnClick="@(() => EliminarProductoAsync(context))">Delete</MudButton>
                     </MudTd>
                 </RowTemplate>
                 <NoRecordsContent>
@@ -185,6 +190,32 @@
         }
     }
 
+    private async Task InhabilitarVehiculoAsync(VehiculoDto vehiculo)
+    {
+        var confirmar = await DialogService.ShowMessageBoxAsync(
+            "Inhabilitar vehículo",
+            $"¿Desea inhabilitar el vehículo {vehiculo.Placa}? No se elimina: pasa a estado Inhabilitado.",
+            yesText: "Sí", cancelText: "No");
+
+        if (confirmar != true)
+        {
+            return;
+        }
+
+        try
+        {
+            await Api.PatchAsync<VehiculoDto>(
+                $"api/vehiculos/{vehiculo.IdVehiculo}/estado",
+                new { Estado = Estados.VehiculoInhabilitado });
+            Snackbar.Add("Vehículo inhabilitado.", Severity.Success);
+            await CargarVehiculosAsync();
+        }
+        catch (ApiException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
     private async Task NuevoProductoAsync()
     {
         var parameters = new DialogParameters { { nameof(ProductoDialog.Edicion), false } };
@@ -211,6 +242,31 @@
         if ((await dialog.Result) is { Canceled: false })
         {
             await CargarProductosAsync();
+        }
+    }
+
+    private async Task EliminarProductoAsync(ProductoDto producto)
+    {
+        var confirmar = await DialogService.ShowMessageBoxAsync(
+            "Eliminar producto",
+            $"¿Desea eliminar el producto {producto.Sku} · {producto.Nombre}? Esta acción no se puede deshacer.",
+            yesText: "Sí", cancelText: "No");
+
+        if (confirmar != true)
+        {
+            return;
+        }
+
+        try
+        {
+            await Api.DeleteAsync<object>($"api/productos/{producto.IdProducto}");
+            Catalogos.Invalidar();
+            Snackbar.Add("Producto eliminado.", Severity.Success);
+            await CargarProductosAsync();
+        }
+        catch (ApiException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
         }
     }
 

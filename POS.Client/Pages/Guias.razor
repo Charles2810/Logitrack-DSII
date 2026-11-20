@@ -107,6 +107,11 @@
                                    OnClick="@(() => EditarAsync(context))" title="Editar" />
                     <MudIconButton Icon="@Icons.Material.Filled.Route" Size="Size.Small" Color="Color.Secondary"
                                    OnClick="@(() => AsignarAsync(context))" title="Asignar hoja de ruta" />
+                    @if (context.HitoActual == Hitos.Registrada)
+                    {
+                        <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Error"
+                                   OnClick="@(() => EliminarAsync(context))">Delete</MudButton>
+                    }
                 </AuthorizeView>
             </MudTd>
         </RowTemplate>
@@ -252,6 +257,30 @@
         if (result is { Canceled: false })
         {
             await BuscarAsync();
+        }
+    }
+
+    private async Task EliminarAsync(GuiaDto guia)
+    {
+        var confirmar = await DialogService.ShowMessageBoxAsync(
+            "Eliminar guía",
+            $"¿Desea eliminar la guía {guia.CodigoGuia}? Solo es posible si está Registrada y no tiene eventos de trazabilidad.",
+            yesText: "Sí", cancelText: "No");
+
+        if (confirmar != true)
+        {
+            return;
+        }
+
+        try
+        {
+            await Api.DeleteAsync<object>($"api/guias/{guia.IdGuia}");
+            Snackbar.Add("Guía eliminada.", Severity.Success);
+            await BuscarAsync();
+        }
+        catch (ApiException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
         }
     }
 

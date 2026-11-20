@@ -44,6 +44,7 @@ public class CheckpointsController : ControllerBase
         var guia = await _context.GuiasEnvio
             .Include(g => g.HitoActual)
             .Include(g => g.HojaRuta)
+            .Include(g => g.Detalles)
             .FirstOrDefaultAsync(g => g.IdGuia == request.IdGuia)
             ?? throw new BusinessException("Guía no encontrada.", 404);
 
@@ -81,6 +82,25 @@ public class CheckpointsController : ControllerBase
             throw new BusinessException("Solo el conductor asignado a la hoja de ruta puede registrar este checkpoint (RN13).");
         }
 
+        var esSalidaAlmacen = hito.Nombre == Hitos.SalidaAlmacen;
+        if (esSalidaAlmacen)
+        {
+            foreach (var detalle in guia.Detalles)
+            {
+                var stock = await _context.Inventarios
+                    .Where(i => i.IdAlmacen == guia.IdAlmacenOrigen && i.IdProducto == detalle.IdProducto)
+                    .Select(i => i.StockActual)
+                    .FirstOrDefaultAsync();
+
+                if (stock < detalle.Cantidad)
+                {
+                    throw new BusinessException(
+                        $"Stock insuficiente en el almacén de origen para el producto {detalle.IdProducto}: " +
+                        $"disponible {stock}, requerido {detalle.Cantidad}.");
+                }
+            }
+        }
+
         var checkpoint = new Checkpoint
         {
             IdGuia = request.IdGuia,
@@ -89,8 +109,28 @@ public class CheckpointsController : ControllerBase
             IdUsuario = idUsuario
         };
 
+        await using var tx = await _context.Database.BeginTransactionAsync();
+
         _context.Checkpoints.Add(checkpoint);
+
+        if (esSalidaAlmacen)
+        {
+            foreach (var detalle in guia.Detalles)
+            {
+                _context.MovimientosInventario.Add(new MovimientoInventario
+                {
+                    IdAlmacen = guia.IdAlmacenOrigen,
+                    IdProducto = detalle.IdProducto,
+                    IdGuia = guia.IdGuia,
+                    IdUsuario = idUsuario,
+                    TipoMovimiento = Estados.TipoSalida,
+                    Cantidad = detalle.Cantidad
+                });
+            }
+        }
+
         await _context.SaveChangesAsync();
+        await tx.CommitAsync();
 
         var creado = await Proyectar(_context.Checkpoints.AsNoTracking()
                 .Where(c => c.IdCheckpoint == checkpoint.IdCheckpoint))

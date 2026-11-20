@@ -227,9 +227,10 @@ CREATE TABLE dbo.notificacion (
     id_notificacion INT IDENTITY(1,1) CONSTRAINT PK_notificacion PRIMARY KEY,
     id_usuario      INT NOT NULL CONSTRAINT FK_notif_usuario REFERENCES dbo.usuario(id_usuario),
     id_guia         INT NULL CONSTRAINT FK_notif_guia REFERENCES dbo.guia_envio(id_guia),
+    id_hoja_ruta    INT NULL CONSTRAINT FK_notif_hoja_ruta REFERENCES dbo.hoja_ruta(id_hoja_ruta),
     tipo            NVARCHAR(30) NOT NULL
                     CONSTRAINT CK_notif_tipo
-                    CHECK (tipo IN (N'Nueva hoja de ruta', N'Incidencia', N'Entrega finalizada')),
+                    CHECK (tipo IN (N'Nueva hoja de ruta', N'Nueva ruta asignada', N'Nueva guía asignada', N'Incidencia', N'Entrega finalizada')),
     mensaje         NVARCHAR(300) NOT NULL,
     leida           BIT NOT NULL CONSTRAINT DF_notif_leida DEFAULT (0),
     fecha_hora      DATETIME2(0) NOT NULL CONSTRAINT DF_notif_fecha DEFAULT (SYSDATETIME()),
@@ -461,12 +462,13 @@ CREATE TRIGGER dbo.trg_hoja_ruta_notifica ON dbo.hoja_ruta
 AFTER INSERT AS
 BEGIN
     SET NOCOUNT ON;
-    INSERT INTO dbo.notificacion (id_usuario, id_guia, tipo, mensaje)
+    INSERT INTO dbo.notificacion (id_usuario, id_guia, id_hoja_ruta, tipo, mensaje)
     SELECT i.id_conductor,
            NULL,
-           N'Nueva hoja de ruta',
-           CONCAT(N'Se te asignó la hoja de ruta #', i.id_hoja_ruta,
-                  N' para el vehículo ', v.placa, N'.')
+           i.id_hoja_ruta,
+           N'Nueva ruta asignada',
+           CONCAT(N'Nueva ruta asignada: hoja #', i.id_hoja_ruta,
+                  N' con el vehículo ', v.placa, N'.')
     FROM inserted i
     JOIN dbo.vehiculo v ON v.id_vehiculo = i.id_vehiculo;
 END
@@ -645,6 +647,28 @@ BEGIN
         ROLLBACK TRANSACTION;
         THROW 50003, N'RNF05: una guía entregada no puede modificarse.', 1;
     END
+END
+GO
+
+-- RN09: notifica al conductor cuando se le asigna una guía a su hoja de ruta.
+CREATE TRIGGER dbo.trg_guia_envio_asigna_notifica ON dbo.guia_envio
+AFTER UPDATE AS
+BEGIN
+    SET NOCOUNT ON;
+
+    INSERT INTO dbo.notificacion (id_usuario, id_guia, id_hoja_ruta, tipo, mensaje)
+    SELECT h.id_conductor,
+           i.id_guia,
+           i.id_hoja_ruta,
+           N'Nueva guía asignada',
+           CONCAT(N'Se te asignó la guía ', g.codigo_guia,
+                  N' en la hoja de ruta #', h.id_hoja_ruta, N'.')
+    FROM inserted i
+    JOIN deleted d ON d.id_guia = i.id_guia
+    JOIN dbo.hoja_ruta h ON h.id_hoja_ruta = i.id_hoja_ruta
+    JOIN dbo.guia_envio g ON g.id_guia = i.id_guia
+    WHERE d.id_hoja_ruta IS NULL
+      AND i.id_hoja_ruta IS NOT NULL;
 END
 GO
 

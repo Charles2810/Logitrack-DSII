@@ -160,7 +160,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         modelBuilder.Entity<HojaRuta>(e =>
         {
-            e.ToTable("hoja_ruta", "dbo", tb => tb.HasTrigger("trg_hoja_ruta_valida"));
+            e.ToTable("hoja_ruta", "dbo", tb =>
+            {
+                tb.HasTrigger("trg_hoja_ruta_valida");
+                tb.HasTrigger("trg_hoja_ruta_notifica");
+            });
             e.HasKey(x => x.IdHojaRuta);
             e.Property(x => x.IdHojaRuta).ValueGeneratedOnAdd();
             e.Property(x => x.Estado).HasMaxLength(20).IsRequired().HasDefaultValue("Pendiente");
@@ -181,7 +185,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         modelBuilder.Entity<GuiaEnvio>(e =>
         {
-            e.ToTable("guia_envio", "dbo", tb => tb.HasTrigger("trg_guia_envio_valida"));
+            e.ToTable("guia_envio", "dbo", tb =>
+            {
+                tb.HasTrigger("trg_guia_envio_valida");
+                tb.HasTrigger("trg_guia_bloqueo_entregada");
+                tb.HasTrigger("trg_guia_envio_asigna_notifica");
+            });
             e.HasKey(x => x.IdGuia);
             e.Property(x => x.IdGuia).ValueGeneratedOnAdd();
             e.Property(x => x.CodigoGuia).HasMaxLength(11).ValueGeneratedOnAddOrUpdate();
@@ -356,6 +365,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasOne(x => x.Guia)
                 .WithMany()
                 .HasForeignKey(x => x.IdGuia)
+                .OnDelete(DeleteBehavior.NoAction);
+            e.HasOne(x => x.HojaRuta)
+                .WithMany()
+                .HasForeignKey(x => x.IdHojaRuta)
                 .OnDelete(DeleteBehavior.NoAction);
         });
 

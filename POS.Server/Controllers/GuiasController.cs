@@ -385,6 +385,42 @@ public class GuiasController : ControllerBase
             .FirstAsync());
     }
 
+    [HttpDelete("{id:int}")]
+    [Authorize(Roles = Roles.AdministradorLogistico)]
+    public async Task<ActionResult> Delete(int id)
+    {
+        var guia = await _context.GuiasEnvio
+            .Include(g => g.HitoActual)
+            .Include(g => g.Detalles)
+            .FirstOrDefaultAsync(g => g.IdGuia == id)
+            ?? throw new BusinessException("Guía no encontrada.", 404);
+
+        if (guia.HitoActual?.Nombre != Hitos.Registrada)
+        {
+            throw new BusinessException("Solo se pueden eliminar guías en el hito Registrada (RNF05).", 409);
+        }
+
+        if (await _context.Checkpoints.AnyAsync(c => c.IdGuia == id) ||
+            await _context.Incidencias.AnyAsync(i => i.IdGuia == id) ||
+            await _context.Entregas.AnyAsync(e => e.IdGuia == id) ||
+            await _context.MovimientosInventario.AnyAsync(m => m.IdGuia == id) ||
+            await _context.Notificaciones.AnyAsync(n => n.IdGuia == id))
+        {
+            throw new BusinessException("No se puede eliminar la guía: ya tiene eventos de trazabilidad asociados (RNF05).", 409);
+        }
+
+        await using var tx = await _context.Database.BeginTransactionAsync();
+
+        _context.DetallesGuia.RemoveRange(guia.Detalles);
+        await _context.SaveChangesAsync();
+
+        _context.GuiasEnvio.Remove(guia);
+        await _context.SaveChangesAsync();
+        await tx.CommitAsync();
+
+        return NoContent();
+    }
+
     private IQueryable<GuiaEnvio> GuiasVisibles()
     {
         IQueryable<GuiaEnvio> query = _context.GuiasEnvio.AsNoTracking();

@@ -186,6 +186,7 @@ public class NotificacionDto
     public int IdUsuario { get; set; }
     public int? IdGuia { get; set; }
     public string? CodigoGuia { get; set; }
+    public int? IdHojaRuta { get; set; }
     public string Tipo { get; set; } = string.Empty;
     public string Mensaje { get; set; } = string.Empty;
     public bool Leida { get; set; }

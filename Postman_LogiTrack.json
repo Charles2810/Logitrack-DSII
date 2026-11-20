@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "a1b2c3d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
     "name": "LogiTrack Solutions - API",
-    "description": "Colección de pruebas de la API REST de LogiTrack Solutions.\n\nORDEN RECOMENDADO\n1. Ejecutar la carpeta 01 Autenticación (guarda los tokens de cada rol).\n2. Ejecutar 02 Catálogos.\n3. Ejecutar 03 Guías -> crear guía y asignarla a una hoja de ruta.\n4. Ejecutar 05 Checkpoints (hitos 2, 3, 4 y 5) con el token del conductor.\n5. Ejecutar 06 Incidencias y 07 Entregas.\n6. Ejecutar el resto de carpetas.\n\nLa cuenta del conductor Carlos Soliz ya tiene la hoja de ruta 1 (Pendiente) en la carga inicial, por lo que una guía nueva asignada a la hoja 1 puede avanzar por todos los hitos.\n\nLos scripts de prueba guardan automáticamente los identificadores creados en variables de colección (idGuia, idHojaRuta, idCliente, etc.).\n\nContraseña de todos los usuarios demo: LogiTrack2026!",
+    "description": "Colección de pruebas de la API REST de LogiTrack Solutions.\n\nORDEN RECOMENDADO\n1. Ejecutar la carpeta 01 Autenticación (guarda los tokens de cada rol).\n2. Ejecutar 02 Catálogos.\n3. Ejecutar 03 Guías -> crear guía y asignarla a una hoja de ruta.\n4. Ejecutar 05 Checkpoints (hitos 2, 3, 4 y 5) con el token del conductor.\n5. Ejecutar 06 Incidencias y 07 Entregas.\n6. Ejecutar el resto de carpetas.\n7. Ejecutar 17 Bajas (DELETE) al final: crea y elimina una guía aislada.\n\nLa cuenta del conductor Carlos Soliz ya tiene la hoja de ruta 1 (Pendiente) en la carga inicial, por lo que una guía nueva asignada a la hoja 1 puede avanzar por todos los hitos.\n\nLos scripts de prueba guardan automáticamente los identificadores creados en variables de colección (idGuia, idHojaRuta, idCliente, etc.).\n\nContraseña de todos los usuarios demo: LogiTrack2026!",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -14,6 +14,7 @@
     { "key": "tokenAlmacen", "value": "" },
     { "key": "tokenSupervisor", "value": "" },
     { "key": "idGuia", "value": "4" },
+    { "key": "idGuiaEliminar", "value": "4" },
     { "key": "codigoGuia", "value": "LT-00000001" },
     { "key": "idHojaRuta", "value": "1" },
     { "key": "idCliente", "value": "1" },
@@ -1005,6 +1006,36 @@
           }
         },
         {
+          "name": "Notificaciones del conductor (RN09)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Lista de notificaciones (200)', () => pm.response.to.have.status(200));",
+                  "pm.test('Guía asignada notificada', () => {",
+                  "    const items = pm.response.json();",
+                  "    pm.expect(items.some(n => n.tipo === 'Nueva guía asignada')).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenConductor}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/notificaciones?limite=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "notificaciones"],
+              "query": [{ "key": "limite", "value": "20" }]
+            },
+            "description": "Verificar RN09: al asignar la guía a la hoja de Carlos se genera una notificación para el conductor."
+          }
+        },
+        {
           "name": "Contador de no leídas",
           "request": {
             "method": "GET",
@@ -1349,6 +1380,31 @@
             },
             "description": "Actualiza los datos del cliente creado previamente."
           }
+        },
+        {
+          "name": "Eliminar cliente",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Cliente eliminado (204)', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminLogistico}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/clientes/{{idCliente}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "clientes", "{{idCliente}}"]
+            },
+            "description": "Baja física del cliente creado en esta carpeta. Si tiene guías asociadas responde 409. Roles: Administrador del Sistema y Administrador Logístico."
+          }
         }
       ]
     },
@@ -1418,6 +1474,31 @@
               "path": ["api", "productos", "{{idProducto}}"]
             },
             "description": "El SKU no se modifica."
+          }
+        },
+        {
+          "name": "Eliminar producto",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Producto eliminado (204)', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminLogistico}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/productos/{{idProducto}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "productos", "{{idProducto}}"]
+            },
+            "description": "Baja física del producto creado en esta carpeta. Si tiene stock, movimientos o detalles de guía responde 409. Roles: Administrador del Sistema y Administrador Logístico."
           }
         }
       ]
@@ -1560,6 +1641,68 @@
               "path": ["api", "files", "upload"]
             },
             "description": "Devuelve la ruta relativa (/uploads/evidencias/...). Guarde la ruta en {{rutaArchivo}} para usarla en incidencias y entregas."
+          }
+        }
+      ]
+    },
+    {
+      "name": "17 Bajas (DELETE)",
+      "item": [
+        {
+          "name": "Crear guía para eliminar (guarda idGuiaEliminar)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const ok = pm.response.code === 201;",
+                  "pm.test('Guía para eliminar creada (201)', () => pm.expect(ok).to.be.true);",
+                  "if (ok) { pm.collectionVariables.set('idGuiaEliminar', String(pm.response.json().idGuia)); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminLogistico}}", "type": "string" }] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idCliente\": 1,\n  \"idAlmacenOrigen\": 1,\n  \"idTipoCarga\": 1,\n  \"idHojaRuta\": null,\n  \"destinatario\": \"Guía a eliminar\",\n  \"direccionDestino\": \"Av. Demo 999, Santa Cruz\",\n  \"pesoKg\": 1.5,\n  \"volumenM3\": 0.01,\n  \"detalles\": [\n    { \"idProducto\": 1, \"cantidad\": 1 }\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/guias",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "guias"]
+            },
+            "description": "Crea una guía Registrada aislada para la prueba de baja; no modifica {{idGuia}}."
+          }
+        },
+        {
+          "name": "Eliminar guía registrada",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Guía eliminada (204)', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminLogistico}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/guias/{{idGuiaEliminar}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "guias", "{{idGuiaEliminar}}"]
+            },
+            "description": "Solo guías en hito Registrada sin checkpoints, incidencias, entregas, movimientos ni notificaciones; si no, responde 409 (RNF05). Rol: Administrador Logístico."
           }
         }
       ]

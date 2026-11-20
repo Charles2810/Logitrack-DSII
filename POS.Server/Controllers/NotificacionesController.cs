@@ -91,6 +91,7 @@ public class NotificacionesController : ControllerBase
             IdUsuario = n.IdUsuario,
             IdGuia = n.IdGuia,
             CodigoGuia = n.Guia != null ? n.Guia.CodigoGuia : null,
+            IdHojaRuta = n.IdHojaRuta,
             Tipo = n.Tipo,
             Mensaje = n.Mensaje,
             Leida = n.Leida,

@@ -55,9 +55,10 @@
                 </MudItem>
             </MudGrid>
 
-            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mt-3">
+            <MudAlert Severity="@(StockDisponible == 0 ? Severity.Warning : Severity.Info)" Variant="Variant.Outlined" Dense="true" Class="mt-3">
+                Stock disponible en este almacén: <b>@StockDisponible</b> unidad(es).
                 El stock se actualiza automáticamente mediante los triggers de la base de datos.
-                RN09: una salida no puede dejar el stock en negativo.
+                RN14: una salida no puede dejar el stock en negativo.
             </MudAlert>
         }
     </DialogContent>
@@ -85,6 +86,7 @@
     private List<AlmacenDto> _almacenes = new();
     private List<ProductoDto> _productos = new();
     private List<GuiaDto> _guias = new();
+    private List<InventarioDto> _inventarios = new();
     private int _idAlmacen;
     private int _idProducto;
     private int? _idGuia;
@@ -94,6 +96,9 @@
     private bool _guardando;
     private string? _error;
 
+    private int StockDisponible => _inventarios
+        .FirstOrDefault(i => i.IdAlmacen == _idAlmacen && i.IdProducto == _idProducto)?.StockActual ?? 0;
+
     protected override async Task OnInitializedAsync()
     {
         try
@@ -101,6 +106,7 @@
             var cat = await Catalogos.GetAsync();
             _almacenes = cat.Almacenes;
             _productos = cat.Productos;
+            _inventarios = await Api.GetAsync<List<InventarioDto>>("api/inventario") ?? new();
 
             var guias = await Api.GetAsync<PagedResult<GuiaDto>>("api/guias?pageSize=100");
             _guias = guias?.Items ?? new List<GuiaDto>();
@@ -123,6 +129,14 @@
         if (_idAlmacen <= 0 || _idProducto <= 0 || _cantidad <= 0)
         {
             _error = "Seleccione almacén, producto y una cantidad mayor a cero.";
+            Snackbar.Add(_error, Severity.Error);
+            return;
+        }
+
+        if (_tipo == Estados.TipoSalida && _cantidad > StockDisponible)
+        {
+            _error = $"Stock insuficiente: hay {StockDisponible} unidad(es) disponibles en este almacén.";
+            Snackbar.Add(_error, Severity.Error);
             return;
         }
 
@@ -146,6 +160,7 @@
         catch (ApiException ex)
         {
             _error = ex.Message;
+            Snackbar.Add(ex.Message, Severity.Error);
         }
         finally
         {

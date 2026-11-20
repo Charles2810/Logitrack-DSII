@@ -86,6 +86,25 @@ public class ProductosController : ControllerBase
         return Ok(ToDto(producto));
     }
 
+    [HttpDelete("{id:int}")]
+    [Authorize(Roles = $"{Roles.AdministradorSistema},{Roles.AdministradorLogistico}")]
+    public async Task<ActionResult> Delete(int id)
+    {
+        var producto = await _context.Productos.FindAsync(id)
+            ?? throw new BusinessException("Producto no encontrado.", 404);
+
+        if (await _context.Inventarios.AnyAsync(i => i.IdProducto == id) ||
+            await _context.MovimientosInventario.AnyAsync(m => m.IdProducto == id) ||
+            await _context.DetallesGuia.AnyAsync(d => d.IdProducto == id))
+        {
+            throw new BusinessException("No se puede eliminar el producto: tiene stock, movimientos o detalles de guía asociados.", 409);
+        }
+
+        _context.Productos.Remove(producto);
+        await _context.SaveChangesAsync();
+        return NoContent();
+    }
+
     private static ProductoDto ToDto(Producto p) => new()
     {
         IdProducto = p.IdProducto,

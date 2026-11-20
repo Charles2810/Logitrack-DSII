@@ -1,4 +1,5 @@
 @using System.ComponentModel.DataAnnotations
+@inject IDialogService DialogService
 
 <MudDialog>
     <TitleContent>
@@ -107,7 +108,8 @@
                                 <MudNumericField T="int" @bind-Value="linea.Cantidad" Label="Cantidad"
                                                  Variant="Variant.Outlined" Min="1" Style="max-width:130px;" />
                                 <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
-                                               OnClick="@(() => QuitarLinea(linea))" />
+                                               title="Eliminar producto del detalle"
+                                               OnClick="@(() => QuitarLineaAsync(linea))" />
                             </div>
                         }
                     }
@@ -212,7 +214,19 @@
         });
     }
 
-    private void QuitarLinea(LineaDetalle linea) => _lineas.Remove(linea);
+    private async Task QuitarLineaAsync(LineaDetalle linea)
+    {
+        var producto = _cat.Productos.FirstOrDefault(p => p.IdProducto == linea.IdProducto);
+        var confirmar = await DialogService.ShowMessageBoxAsync(
+            "Eliminar producto del detalle",
+            $"¿Desea eliminar {producto?.Sku ?? "el producto"} del detalle de la guía?",
+            yesText: "Sí", cancelText: "No");
+
+        if (confirmar == true)
+        {
+            _lineas.Remove(linea);
+        }
+    }
 
     private async Task GuardarAsync()
     {

@@ -1,6 +1,7 @@
 @page "/clientes"
 @attribute [Authorize(Roles = "Administrador del Sistema,Administrador Logístico")]
 @inject ApiClient Api
+@inject CatalogosService Catalogos
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 
@@ -45,6 +46,8 @@
             <MudTd align="Right">
                 <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
                                title="Editar cliente" OnClick="@(() => EditarAsync(context))" />
+                <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Error"
+                           OnClick="@(() => EliminarAsync(context))">Delete</MudButton>
             </MudTd>
         </RowTemplate>
         <NoRecordsContent>
@@ -111,6 +114,31 @@
         if ((await dialog.Result) is { Canceled: false })
         {
             await CargarAsync();
+        }
+    }
+
+    private async Task EliminarAsync(ClienteDto cliente)
+    {
+        var confirmar = await DialogService.ShowMessageBoxAsync(
+            "Eliminar cliente",
+            $"¿Desea eliminar al cliente {cliente.RazonSocial}? Esta acción no se puede deshacer.",
+            yesText: "Sí", cancelText: "No");
+
+        if (confirmar != true)
+        {
+            return;
+        }
+
+        try
+        {
+            await Api.DeleteAsync<object>($"api/clientes/{cliente.IdCliente}");
+            Catalogos.Invalidar();
+            Snackbar.Add("Cliente eliminado.", Severity.Success);
+            await CargarAsync();
+        }
+        catch (ApiException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
         }
     }
 }

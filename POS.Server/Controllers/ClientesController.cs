@@ -89,6 +89,23 @@ public class ClientesController : ControllerBase
         return Ok(ToDto(cliente));
     }
 
+    [HttpDelete("{id:int}")]
+    [Authorize(Roles = $"{Roles.AdministradorSistema},{Roles.AdministradorLogistico}")]
+    public async Task<ActionResult> Delete(int id)
+    {
+        var cliente = await _context.Clientes.FindAsync(id)
+            ?? throw new BusinessException("Cliente no encontrado.", 404);
+
+        if (await _context.GuiasEnvio.AnyAsync(g => g.IdCliente == id))
+        {
+            throw new BusinessException("No se puede eliminar el cliente: tiene guías de envío asociadas.", 409);
+        }
+
+        _context.Clientes.Remove(cliente);
+        await _context.SaveChangesAsync();
+        return NoContent();
+    }
+
     private static ClienteDto ToDto(Cliente c) => new()
     {
         IdCliente = c.IdCliente,

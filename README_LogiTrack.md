@@ -8,7 +8,7 @@ La solución incluye:
 - API REST protegida con JWT y autorización por roles.
 - Base de datos `LogiTrackDB` con reglas de negocio implementadas mediante triggers, constraints, columnas calculadas y vistas.
 - Datos de demostración y siete usuarios de prueba.
-- Colección Postman con 63 peticiones para probar todos los módulos.
+- Colección Postman con 68 peticiones para probar todos los módulos.
 
 ---
 
@@ -24,7 +24,7 @@ Navegador
    │                                                        └──► SQL Server (LogiTrackDB)
    │                                                                  ├── 18 tablas
    │                                                                  ├── 2 vistas
-   │                                                                  └── 22 triggers
+   │                                                                  └── 23 triggers
    │
    └── Archivos estáticos servidos por POS.Server
 ```
@@ -49,7 +49,7 @@ POS/
 ├── Contexto.docx              # Requisitos del proyecto
 ├── database.sql               # Script que crea y recrea LogiTrackDB
 ├── logo.png                   # Identidad visual
-├── Postman_LogiTrack.json     # Colección Postman (63 peticiones)
+├── Postman_LogiTrack.json     # Colección Postman (68 peticiones)
 ├── README_LogiTrack.md        # Este documento
 └── Plantilla/
     ├── POS.slnx               # Solución
@@ -122,7 +122,7 @@ Resultado esperado:
 | Métrica | Valor |
 |---|---|
 | Tablas | 18 |
-| Triggers | 22 |
+| Triggers | 23 |
 | Usuarios demo | 7 |
 | Guías demo | 4 |
 | Hojas de ruta demo | 2 |
@@ -284,13 +284,23 @@ Las reglas se validan en SQL Server; la API traduce los errores a mensajes claro
 | RN06 | Checkpoint válido: guía con hoja de ruta y usuario autorizado |
 | RN07 | Entrega con firma y foto obligatorias; marca `Entregado` y bloquea cambios |
 | RN08 | Incidencia con descripción y foto obligatorias |
-| RN09 | Notificaciones internas generadas por triggers |
+| RN09 | Notificaciones internas generadas por triggers (`Nueva ruta asignada`, `Nueva guía asignada`, incidencia y entrega) |
 | RN10 | Rastreo público sin datos personales (vista dedicada) |
 | RN11 | Los usuarios no se eliminan; solo se activan/desactivan |
 | RN12 | Separación de funciones por rol a nivel de API y de base de datos |
 | RN13 | El conductor solo opera sobre guías de sus propias hojas de ruta |
 | RN14 | Integridad de inventario y bloqueo de stock negativo |
 | RNF05 | Auditoría temporal y consistencia transaccional |
+
+### 8.1 Transacciones en el control de mercancía
+
+- Cada `SaveChangesAsync()` se ejecuta dentro de una transacción de EF Core, por lo que el movimiento y el ajuste de stock que hace el trigger `trg_movimiento_inventario` (`database.sql:1018-1079`) quedan atómicos: si el stock es insuficiente, el trigger ejecuta `ROLLBACK TRANSACTION` y `THROW 50016` (RN14), sin dejar movimientos huérfanos.
+- Al registrar el checkpoint **Salida de Almacén** (`CheckpointsController.cs:85-133`) se generan automáticamente los movimientos `SALIDA` del almacén de origen por cada producto del detalle de la guía. El checkpoint, los movimientos y el descuento de stock se confirman juntos con `CommitAsync()`; si falta stock, no se registra ni el checkpoint. No registrar además un movimiento manual `SALIDA` para esa guía, porque duplicaría el descuento.
+- Los trigger de hito, notificaciones y eventos también se ejecutan en la misma transacción de la petición. `trg_guia_envio_asigna_notifica` avisa al conductor cuando su guía pasa de `Sin asignar` a una hoja de ruta (`database.sql:651-670`).
+- Cuando una operación escribe en varias tablas con más de un `SaveChangesAsync()`, se usa una transacción explícita:
+  - `GuiasController.cs:336-352`: reemplazo del detalle de la guía (RN05/RNF05).
+  - `GuiasController.cs:412-419`: baja de la guía; primero elimina `detalle_guia` y luego la guía, con `CommitAsync()` al final.
+- Las bajas de cliente y producto validan las FK antes de borrar y devuelven `409` si el registro está referenciado, evitando estados parciales.
 
 ---
 
@@ -347,6 +357,7 @@ Contrato de error:
 | POST | `/api/guias` | Administrador Logístico | Crea la guía y sus detalles |
 | PUT | `/api/guias/{id}` | Administrador Logístico | Actualiza una guía `Registrada` |
 | PATCH | `/api/guias/{id}/hoja-ruta` | Administrador Logístico | Asigna o quita la hoja de ruta |
+| DELETE | `/api/guias/{id}` | Administrador Logístico | Baja de una guía `Registrada` sin eventos de trazabilidad (RNF05) |
 
 ### 9.4 Hojas de ruta
 
@@ -481,10 +492,14 @@ Invoke-RestMethod "http://localhost:5163/api/tracking/LT-00000001"
 |---|---|---|
 | GET | `/api/clientes` | Autenticado |
 | POST / PUT | `/api/clientes`, `/api/clientes/{id}` | Admin. Sistema / Admin. Logístico |
+| DELETE | `/api/clientes/{id}` | Admin. Sistema / Admin. Logístico |
 | GET | `/api/productos` | Autenticado |
 | POST / PUT | `/api/productos`, `/api/productos/{id}` | Admin. Sistema / Admin. Logístico |
+| DELETE | `/api/productos/{id}` | Admin. Sistema / Admin. Logístico |
 | GET | `/api/vehiculos`, `/api/vehiculos/{id}` | Autenticado |
 | POST / PUT / PATCH | `/api/vehiculos`, `/api/vehiculos/{id}`, `/api/vehiculos/{id}/estado` | Admin. Sistema / Admin. Logístico |
+
+Las bajas son físicas y devuelven `204`. Responden `404` si el registro no existe y `409` si está referenciado: un cliente con guías de envío; un producto con stock, movimientos o detalles de guía; una guía que no esté `Registrada` o que ya tenga checkpoints, incidencias, entregas, movimientos o notificaciones (RNF05).
 
 ### 9.14 Archivos
 
@@ -516,15 +531,16 @@ Respuesta:
 
 1. Abrir Postman.
 2. `File` → `Import` → seleccionar `Postman_LogiTrack.json`.
-3. Verificar que la colección **LogiTrack Solutions - API** tenga 16 carpetas y 63 peticiones.
+3. Verificar que la colección **LogiTrack Solutions - API** tenga 17 carpetas y 68 peticiones.
 4. Revisar las variables de colección (`Variables`). La más importante es:
 
    | Variable | Valor inicial |
    |---|---|
    | `baseUrl` | `http://localhost:5163` |
    | `passwordDemo` | `LogiTrack2026!` |
-   | `idGuia` | `4` |
-   | `codigoGuia` | `LT-00000001` |
+    | `idGuia` | `4` |
+    | `idGuiaEliminar` | `4` |
+    | `codigoGuia` | `LT-00000001` |
    | `idHojaRuta` | `1` |
    | `idCliente` | `1` |
    | `idProducto` | `1` |
@@ -549,19 +565,21 @@ Ejecutar las carpetas en este orden:
 10. **10 Reportes** — dashboard y reporte de envíos.
 11. **11 Rastreo público** — consultar `{{codigoGuia}}`.
 12. **12 a 16** — usuarios, clientes, productos, vehículos y archivos.
+13. **17 Bajas (DELETE)** — crear y eliminar una guía aislada; al final de las carpetas 13 y 14 también se eliminan el cliente y el producto creados.
 
-> Las peticiones de escritura guardan los identificadores creados en variables de colección, por lo que las peticiones siguientes usan automáticamente el registro recién creado.
+> Las peticiones de escritura guardan los identificadores creados en variables de colección, por lo que las peticiones siguientes usan automáticamente el registro recién creado. La carpeta 17 usa `idGuiaEliminar` para no afectar `idGuia`.
 
 ### 10.3 Flujo completo sugerido (smoke test)
 
 1. Ejecutar los cinco **Login** de la carpeta 01.
 2. Ejecutar **Crear guía**. Se guardan `idGuia` y `codigoGuia`.
 3. Ejecutar **Asignar guía a hoja de ruta** (usa la hoja 1 de Carlos).
-4. Ejecutar **Checkpoint 1**, **2**, **3** y **4** con el token del conductor.
-5. Ejecutar **Registrar incidencia**.
-6. Ejecutar **Registrar entrega**.
-7. Ejecutar **Consultar tracking por código**: debe devolver estado `Entregado` y los eventos del recorrido.
-8. Ejecutar **Dashboard** y **Reporte de envíos**.
+4. Ejecutar **Notificaciones** con `tokenConductor`: deben aparecer `Nueva ruta asignada` y `Nueva guía asignada`, cada una con su botón **Ver ruta**.
+5. Ejecutar **Checkpoint 1** (Salida de Almacén): verifica en **08 Inventario** que el stock bajó según el detalle de la guía; luego ejecuta los checkpoints **2**, **3** y **4**.
+6. Ejecutar **Registrar incidencia**.
+7. Ejecutar **Registrar entrega**.
+8. Ejecutar **Consultar tracking por código**: debe devolver estado `Entregado` y los eventos del recorrido.
+9. Ejecutar **Dashboard** y **Reporte de envíos**.
 
 Si se desea repetir el flujo desde cero, volver a cargar `database.sql` (deteniendo antes el servidor) para restaurar el estado demo.
 
@@ -579,6 +597,10 @@ Si se desea repetir el flujo desde cero, volver a cargar `database.sql` (detenie
 | Entrega sin firma/foto | `POST /api/entregas` sin `rutaFirma` | `400` |
 | SALIDA mayor al stock | `POST /api/inventario/movimientos` | `400`/`409` con mensaje de stock |
 | Eliminar usuario | No existe endpoint `DELETE` | `405` / no expuesto |
+| Eliminar cliente con guías | `DELETE /api/clientes/1` | `409` |
+| Eliminar producto con stock | `DELETE /api/productos/1` | `409` |
+| Eliminar guía despachada | `DELETE /api/guias/{idGuia}` con hito distinto de `Registrada` | `409` (RNF05) |
+| Eliminar con token de Almacén | `DELETE /api/clientes/{id}` o `/api/productos/{id}` | `403` |
 | Subir archivo mayor a 5 MB | `POST /api/files/upload` | `400`/`413` |
 
 ### 10.5 Subida de archivos en Postman
@@ -685,13 +707,13 @@ Invoke-RestMethod "http://localhost:5163/api/tracking/LT-00000001"
 
 ## 13. Checklist de entrega
 
-- [x] Base de datos `LogiTrackDB` con 18 tablas, 2 vistas y 22 triggers.
+- [x] Base de datos `LogiTrackDB` con 18 tablas, 2 vistas y 23 triggers.
 - [x] API REST con 16 controladores y autenticación JWT por roles.
 - [x] Interfaz Blazor WASM completa en español.
 - [x] Módulos de guías, hojas de ruta, checkpoints, incidencias, entregas, inventario, notificaciones, reportes, usuarios, clientes, flota y rastreo público.
 - [x] Carga de firmas, fotos y evidencias.
 - [x] Datos demo y siete usuarios de prueba.
-- [x] Colección Postman con 63 peticiones.
+- [x] Colección Postman con 68 peticiones.
 - [x] Instrucciones de instalación, ejecución y pruebas en este documento.
 
 ---
