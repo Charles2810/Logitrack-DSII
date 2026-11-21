@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using POS.Shared.Utils;
 
 namespace POS.Shared.DTOs;
 
@@ -38,6 +39,12 @@ public class CrearGuiaRequest
     [Required, MaxLength(200)]
     public string DireccionDestino { get; set; } = string.Empty;
 
+    [Range(-90, 90)]
+    public double? LatitudDestino { get; set; }
+
+    [Range(-180, 180)]
+    public double? LongitudDestino { get; set; }
+
     [Range(0.01, 9_999_999, ErrorMessage = "El peso debe ser mayor a cero.")]
     public decimal PesoKg { get; set; }
 
@@ -63,6 +70,12 @@ public class ActualizarGuiaRequest
 
     [Required, MaxLength(200)]
     public string DireccionDestino { get; set; } = string.Empty;
+
+    [Range(-90, 90)]
+    public double? LatitudDestino { get; set; }
+
+    [Range(-180, 180)]
+    public double? LongitudDestino { get; set; }
 
     [Range(0.01, 9_999_999)]
     public decimal PesoKg { get; set; }
@@ -97,6 +110,12 @@ public class GuiaDto
     public string UsuarioRegistro { get; set; } = string.Empty;
     public string Destinatario { get; set; } = string.Empty;
     public string DireccionDestino { get; set; } = string.Empty;
+    public double? LatitudOrigen { get; set; }
+    public double? LongitudOrigen { get; set; }
+    public double? LatitudDestino { get; set; }
+    public double? LongitudDestino { get; set; }
+    public decimal? DistanciaEstimadaKm { get; set; }
+    public int? DuracionEstimadaMin { get; set; }
     public decimal PesoKg { get; set; }
     public decimal VolumenM3 { get; set; }
     public DateTime FechaRegistro { get; set; }
@@ -104,6 +123,19 @@ public class GuiaDto
     public int TotalIncidencias { get; set; }
     public bool TieneEntrega { get; set; }
     public List<DetalleGuiaDto>? Detalles { get; set; }
+
+    /// <summary>Indica si la guía tiene coordenadas suficientes para mostrar el mapa.</summary>
+    public bool TieneRuta => GeoCalculos.SonValidas(LatitudOrigen, LongitudOrigen) &&
+                             GeoCalculos.SonValidas(LatitudDestino, LongitudDestino);
+
+    /// <summary>Distancia en km: usa la estimación guardada o calcula una aproximación.</summary>
+    public double DistanciaRutaKm => DistanciaEstimadaKm.HasValue
+        ? (double)DistanciaEstimadaKm.Value
+        : GeoCalculos.DistanciaKm(LatitudOrigen, LongitudOrigen, LatitudDestino, LongitudDestino);
+
+    /// <summary>Duración estimada en minutos para la simulación de entrega.</summary>
+    public int DuracionRutaMin => DuracionEstimadaMin ??
+                                  GeoCalculos.DuracionEstimadaMin(DistanciaRutaKm);
 }
 
 public class GuiaFiltro

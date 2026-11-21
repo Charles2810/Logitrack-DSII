@@ -20,6 +20,12 @@
      RN13  alcance del conductor     -> triggers de checkpoint/incidencia/entrega
      RNF05 integridad y auditoría    -> bloqueo de guías entregadas y eventos
    ============================================================ */
+/* ============================================================
+   AMPLIACIÓN DE SEGUIMIENTO Y MAPAS (Leaflet + OSRM):
+     - almacen/cliente/guia_envio almacenan coordenadas geograficas.
+     - Las coordenadas permiten trazar rutas, estimar distancias y tiempos,
+       y animar entregas simuladas desde el cliente.
+   ============================================================ */
 SET NOCOUNT ON;
 SET ANSI_NULLS ON;
 SET QUOTED_IDENTIFIER ON;
@@ -75,6 +81,8 @@ CREATE TABLE dbo.cliente (
     nit          NVARCHAR(30) NOT NULL CONSTRAINT UQ_cliente_nit UNIQUE,
     telefono     NVARCHAR(25) NULL,
     direccion    NVARCHAR(200) NULL,
+    latitud      DECIMAL(9,6) NULL CONSTRAINT CK_cliente_latitud  CHECK (latitud  BETWEEN -90.000000 AND 90.000000),
+    longitud     DECIMAL(9,6) NULL CONSTRAINT CK_cliente_longitud CHECK (longitud BETWEEN -180.000000 AND 180.000000),
     CONSTRAINT CK_cliente_razon CHECK (LEN(LTRIM(RTRIM(razon_social))) > 0),
     CONSTRAINT CK_cliente_nit CHECK (LEN(LTRIM(RTRIM(nit))) > 0)
 );
@@ -85,7 +93,9 @@ CREATE TABLE dbo.almacen (
     tipo       NVARCHAR(30) NOT NULL
                CONSTRAINT CK_almacen_tipo CHECK (tipo IN (N'Almacén', N'Centro de Distribución')),
     ciudad     NVARCHAR(80) NOT NULL,
-    direccion  NVARCHAR(200) NULL
+    direccion  NVARCHAR(200) NULL,
+    latitud    DECIMAL(9,6) NULL CONSTRAINT CK_almacen_latitud  CHECK (latitud  BETWEEN -90.000000 AND 90.000000),
+    longitud   DECIMAL(9,6) NULL CONSTRAINT CK_almacen_longitud CHECK (longitud BETWEEN -180.000000 AND 180.000000)
 );
 
 CREATE TABLE dbo.tipo_carga (
@@ -159,6 +169,10 @@ CREATE TABLE dbo.guia_envio (
     id_usuario_registro INT NOT NULL CONSTRAINT FK_guia_usuario REFERENCES dbo.usuario(id_usuario),
     destinatario        NVARCHAR(120) NOT NULL,
     direccion_destino   NVARCHAR(200) NOT NULL,
+    latitud_destino     DECIMAL(9,6) NULL CONSTRAINT CK_guia_latitud  CHECK (latitud_destino  BETWEEN -90.000000 AND 90.000000),
+    longitud_destino    DECIMAL(9,6) NULL CONSTRAINT CK_guia_longitud CHECK (longitud_destino BETWEEN -180.000000 AND 180.000000),
+    distancia_estimada_km  DECIMAL(10,2) NULL CONSTRAINT CK_guia_distancia CHECK (distancia_estimada_km >= 0),
+    duracion_estimada_min  INT NULL CONSTRAINT CK_guia_duracion CHECK (duracion_estimada_min >= 0),
     peso_kg             DECIMAL(10,2) NOT NULL CONSTRAINT CK_guia_peso CHECK (peso_kg > 0),
     volumen_m3          DECIMAL(10,3) NOT NULL CONSTRAINT CK_guia_vol  CHECK (volumen_m3 > 0),
     fecha_registro      DATETIME2(0) NOT NULL CONSTRAINT DF_guia_fecha DEFAULT (SYSDATETIME()),
@@ -246,6 +260,7 @@ CREATE INDEX IX_guia_hito          ON dbo.guia_envio (id_hito_actual);
 CREATE INDEX IX_guia_hoja          ON dbo.guia_envio (id_hoja_ruta);
 CREATE INDEX IX_guia_fecha         ON dbo.guia_envio (fecha_registro);
 CREATE INDEX IX_guia_estado_fecha  ON dbo.guia_envio (id_hito_actual, fecha_registro);
+CREATE INDEX IX_guia_destino_geo   ON dbo.guia_envio (latitud_destino, longitud_destino);
 CREATE INDEX IX_hoja_conductor     ON dbo.hoja_ruta (id_conductor, estado);
 CREATE INDEX IX_hoja_vehiculo      ON dbo.hoja_ruta (id_vehiculo, estado);
 CREATE INDEX IX_checkpoint_guia    ON dbo.[checkpoint] (id_guia, fecha_hora);
@@ -1117,15 +1132,15 @@ INSERT INTO dbo.usuario (id_rol, nombre_completo, correo, password_hash, activo)
  (3, N'Diego Vargas', N'diego.vargas@logitrack.test', N'$2a$11$/R28XE3Vbe0.fheyRNs1/ukcHyTmlC3o.9nGnqLQzNgTvP.g.P0I.', 1),
  (3, N'Sofía Campos', N'sofia.campos@logitrack.test', N'$2a$11$/R28XE3Vbe0.fheyRNs1/ukcHyTmlC3o.9nGnqLQzNgTvP.g.P0I.', 0);
 
-INSERT INTO dbo.almacen (nombre, tipo, ciudad, direccion) VALUES
- (N'Almacén Central',     N'Almacén',               N'Santa Cruz de la Sierra', N'Parque Industrial, Av. 3er Anillo'),
- (N'CD Local Norte',      N'Centro de Distribución', N'Santa Cruz de la Sierra', N'Zona Norte, Av. Banzer km 8'),
- (N'CD Local Sur',        N'Centro de Distribución', N'Santa Cruz de la Sierra', N'Zona Sur, Av. Santos Dumont');
+INSERT INTO dbo.almacen (nombre, tipo, ciudad, direccion, latitud, longitud) VALUES
+ (N'Almacén Central',     N'Almacén',               N'Santa Cruz de la Sierra', N'Parque Industrial, Av. 3er Anillo', -17.783700, -63.180426),
+ (N'CD Local Norte',      N'Centro de Distribución', N'Santa Cruz de la Sierra', N'Zona Norte, Av. Banzer km 8',     -17.748400, -63.189500),
+ (N'CD Local Sur',        N'Centro de Distribución', N'Santa Cruz de la Sierra', N'Zona Sur, Av. Santos Dumont',     -17.812500, -63.181700);
 
-INSERT INTO dbo.cliente (razon_social, nit, telefono, direccion) VALUES
- (N'Comercial Andina S.R.L.',       N'1020304050', N'70000001', N'Av. Banzer km 5'),
- (N'Distribuidora El Oriente S.A.', N'1020304051', N'70000002', N'Av. Cristo Redentor km 3'),
- (N'Ferretería Central S.R.L.',     N'1020304052', N'70000003', N'Calle Sucre 120');
+INSERT INTO dbo.cliente (razon_social, nit, telefono, direccion, latitud, longitud) VALUES
+ (N'Comercial Andina S.R.L.',       N'1020304050', N'70000001', N'Av. Banzer km 5',          -17.770500, -63.190000),
+ (N'Distribuidora El Oriente S.A.', N'1020304051', N'70000002', N'Av. Cristo Redentor km 3', -17.795200, -63.165400),
+ (N'Ferretería Central S.R.L.',     N'1020304052', N'70000003', N'Calle Sucre 120', -17.779300, -63.177800);
 
 INSERT INTO dbo.producto (sku, nombre, peso_unitario_kg, volumen_unitario_m3) VALUES
  (N'SKU-0001', N'Caja de herramientas', 2.500, 0.0300),
@@ -1153,12 +1168,13 @@ INSERT INTO dbo.hoja_ruta (id_vehiculo, id_conductor, id_usuario_creador, estado
 
 INSERT INTO dbo.guia_envio
  (id_cliente, id_almacen_origen, id_tipo_carga, id_hoja_ruta, id_usuario_registro,
-  destinatario, direccion_destino, peso_kg, volumen_m3, fecha_registro)
+  destinatario, direccion_destino, latitud_destino, longitud_destino,
+  distancia_estimada_km, duracion_estimada_min, peso_kg, volumen_m3, fecha_registro)
 VALUES
- (1, 1, 1, 1,    1, N'Juan Pérez',      N'Calle 21 de Mayo 100',      25.00, 0.300, DATEADD(HOUR, -50, @ahora)),
- (2, 1, 2, 1,    1, N'María Gutiérrez', N'Av. Cristo Redentor 250',   16.00, 0.200, DATEADD(HOUR, -48, @ahora)),
- (3, 1, 3, 2,    1, N'Pedro Salazar',   N'Av. Santos Dumont 300',     40.00, 0.500, DATEADD(HOUR, -23, @ahora)),
- (1, 1, 1, NULL, 1, N'Lucía Fernández', N'Calle Sucre 45',            12.00, 0.150, DATEADD(HOUR,  -2, @ahora));
+ (1, 1, 1, 1,    1, N'Juan Pérez',      N'Calle 21 de Mayo 100',      -17.779800, -63.186700, 2.40, 10, 25.00, 0.300, DATEADD(HOUR, -50, @ahora)),
+ (2, 1, 2, 1,    1, N'María Gutiérrez', N'Av. Cristo Redentor 250',   -17.796100, -63.164900, 2.70, 12, 16.00, 0.200, DATEADD(HOUR, -48, @ahora)),
+ (3, 1, 3, 2,    1, N'Pedro Salazar',   N'Av. Santos Dumont 300',     -17.812900, -63.180900, 4.30, 16, 40.00, 0.500, DATEADD(HOUR, -23, @ahora)),
+ (1, 1, 1, NULL, 1, N'Lucía Fernández', N'Calle Sucre 45',            -17.779300, -63.177800, 0.80, 6, 12.00, 0.150, DATEADD(HOUR,  -2, @ahora));
 
 INSERT INTO dbo.detalle_guia (id_guia, id_producto, cantidad) VALUES
  (1, 1, 8), (1, 3, 4),
@@ -1223,6 +1239,11 @@ UNION ALL SELECT 'checkpoints',  COUNT(*) FROM dbo.[checkpoint]
 UNION ALL SELECT 'incidencias',  COUNT(*) FROM dbo.incidencia
 UNION ALL SELECT 'entregas',     COUNT(*) FROM dbo.entrega
 UNION ALL SELECT 'notificacion', COUNT(*) FROM dbo.notificacion;
+
+SELECT id_almacen, nombre, latitud, longitud FROM dbo.almacen ORDER BY id_almacen;
+SELECT id_guia, codigo_guia, latitud_destino, longitud_destino,
+       distancia_estimada_km, duracion_estimada_min
+FROM dbo.guia_envio ORDER BY id_guia;
 
 SELECT * FROM dbo.inventario ORDER BY id_almacen, id_producto;
 

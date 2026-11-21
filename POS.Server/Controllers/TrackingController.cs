@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using POS.Server.Data;
 using POS.Shared.DTOs;
+using POS.Shared.Utils;
 
 namespace POS.Server.Controllers;
 
@@ -55,11 +56,38 @@ public class TrackingController : ControllerBase
             .Select(t => t.EstadoActual)
             .FirstAsync();
 
+        // Coordenadas de la guía para el mapa de seguimiento (sin datos personales).
+        var ruta = await _context.GuiasEnvio.AsNoTracking()
+            .Where(g => g.CodigoGuia == busqueda)
+            .Select(g => new
+            {
+                LatitudOrigen = (double?)g.AlmacenOrigen!.Latitud,
+                LongitudOrigen = (double?)g.AlmacenOrigen!.Longitud,
+                LatitudDestino = (double?)g.LatitudDestino,
+                LongitudDestino = (double?)g.LongitudDestino,
+                DistanciaGuardada = (double?)g.DistanciaEstimadaKm,
+                DuracionGuardada = g.DuracionEstimadaMin
+            })
+            .FirstOrDefaultAsync();
+
+        var distancia = ruta?.DistanciaGuardada ?? 0;
+        if (distancia <= 0 && ruta != null)
+        {
+            distancia = GeoCalculos.DistanciaKm(ruta.LatitudOrigen, ruta.LongitudOrigen,
+                ruta.LatitudDestino, ruta.LongitudDestino);
+        }
+
         return Ok(new TrazabilidadDto
         {
-            CodigoGuia = eventos.Count > 0 ? busqueda.ToUpperInvariant() : busqueda,
+            CodigoGuia = busqueda.ToUpperInvariant(),
             EstadoActual = estado,
-            Eventos = eventos
+            Eventos = eventos,
+            LatitudOrigen = ruta?.LatitudOrigen,
+            LongitudOrigen = ruta?.LongitudOrigen,
+            LatitudDestino = ruta?.LatitudDestino,
+            LongitudDestino = ruta?.LongitudDestino,
+            DistanciaKm = distancia,
+            DuracionEstimadaMin = ruta?.DuracionGuardada ?? GeoCalculos.DuracionEstimadaMin(distancia)
         });
     }
 }

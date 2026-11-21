@@ -1,0 +1,174 @@
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<div id="@_id" class="lt-mapa @(AltoGrande ? "lt-mapa-grande" : "")"></div>
+
+@code {
+    private readonly string _id = "lt-mapa-" + Guid.NewGuid().ToString("N");
+    private DotNetObjectReference<MapaRutas>? _referencia;
+    private bool _inicializado;
+    private bool _rutaLista;
+    private MapaRutaDto? _ultimaRuta;
+
+    /// <summary>Centro inicial; por defecto Santa Cruz de la Sierra.</summary>
+    [Parameter]
+    public double? LatitudCentro { get; set; }
+
+    [Parameter]
+    public double? LongitudCentro { get; set; }
+
+    [Parameter]
+    public int Zoom { get; set; } = 13;
+
+    /// <summary>Permite hacer clic en el mapa para fijar coordenadas.</summary>
+    [Parameter]
+    public bool Seleccionable { get; set; }
+
+    [Parameter]
+    public EventCallback<(double Latitud, double Longitud)> OnCoordenadasSeleccionadas { get; set; }
+
+    [Parameter]
+    public bool AltoGrande { get; set; }
+
+    /// <summary>Datos de la ruta que se dibujará en el mapa.</summary>
+    [Parameter]
+    public MapaRutaDto? Ruta { get; set; }
+
+    /// <summary>Muestra el vehículo animado sobre la ruta.</summary>
+    [Parameter]
+    public bool Animar { get; set; }
+
+    [Parameter]
+    public int VelocidadAnimacion { get; set; } = 1;
+
+    [Parameter]
+    public EventCallback<ProgresoRuta> OnProgreso { get; set; }
+
+    [Parameter]
+    public EventCallback OnAnimacionFinalizada { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                _referencia = DotNetObjectReference.Create(this);
+
+                // window.logitrackMapas se registra al cargar js/mapa.js desde index.html.
+                await JS.InvokeVoidAsync("logitrackMapas.inicializar", _id, _referencia, new
+                {
+                    centro = new { lat = LatitudCentro ?? -17.783700, lng = LongitudCentro ?? -63.180426 },
+                    zoom = Zoom,
+                    seleccionable = Seleccionable
+                });
+                _inicializado = true;
+
+                if (Ruta != null)
+                {
+                    await DibujarRutaAsync();
+                }
+            }
+            catch (JSException)
+            {
+                // Si JS no está disponible (SSR/prerender), el mapa simplemente no se dibuja.
+            }
+        }
+    }
+
+    public async Task ActualizarRutaAsync(MapaRutaDto? ruta)
+    {
+        Ruta = ruta;
+        _ultimaRuta = ruta;
+        if (!_inicializado) return;
+
+        await JS.InvokeVoidAsync("logitrackMapas.establecerPuntos", _id,
+            ruta?.Origen, ruta?.Destino);
+
+        _rutaLista = false;
+        if (ruta?.PuedeTrazar == true)
+        {
+            await JS.InvokeAsync<object?>("logitrackMapas.trazarRuta", _id,
+                ruta.Origen, ruta.Destino, ruta.Waypoints);
+            _rutaLista = true;
+        }
+    }
+
+    private async Task DibujarRutaAsync()
+    {
+        await ActualizarRutaAsync(Ruta);
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_inicializado && !ReferenceEquals(Ruta, _ultimaRuta))
+        {
+            await ActualizarRutaAsync(Ruta);
+        }
+    }
+
+    public async Task IniciarAnimacionAsync()
+    {
+        if (!_inicializado || Ruta?.PuedeTrazar != true) return;
+        if (!_rutaLista)
+        {
+            await JS.InvokeAsync<object?>("logitrackMapas.trazarRuta", _id,
+                Ruta.Origen, Ruta.Destino, Ruta.Waypoints);
+            _rutaLista = true;
+        }
+        await JS.InvokeVoidAsync("logitrackMapas.animar", _id, new { velocidad = VelocidadAnimacion });
+    }
+
+    public async Task PausarAnimacionAsync()
+    {
+        if (!_inicializado) return;
+        await JS.InvokeVoidAsync("logitrackMapas.pausar", _id);
+    }
+
+    public async Task ReanudarAnimacionAsync()
+    {
+        if (!_inicializado) return;
+        await JS.InvokeVoidAsync("logitrackMapas.reanudar", _id);
+    }
+
+    public async Task ReiniciarAnimacionAsync()
+    {
+        if (!_inicializado) return;
+        await JS.InvokeVoidAsync("logitrackMapas.reiniciar", _id);
+    }
+
+    [JSInvokable]
+    public async Task OnMapaClick(double latitud, double longitud)
+    {
+        await OnCoordenadasSeleccionadas.InvokeAsync((latitud, longitud));
+    }
+
+    [JSInvokable("OnProgreso")]
+    public async Task RecibirProgreso(double progreso, double latitud, double longitud, double restanteKm, int restanteMin)
+    {
+        await OnProgreso.InvokeAsync(new ProgresoRuta(progreso, latitud, longitud, restanteKm, restanteMin));
+    }
+
+    [JSInvokable("OnAnimacionFinalizada")]
+    public async Task RecibirAnimacionFinalizada()
+    {
+        await OnAnimacionFinalizada.InvokeAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _referencia?.Dispose();
+        if (_inicializado)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("logitrackMapas.limpiar", _id);
+            }
+            catch (JSException)
+            {
+            }
+        }
+    }
+}
+

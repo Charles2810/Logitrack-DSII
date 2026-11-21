@@ -62,6 +62,8 @@ public class ClienteDto
     public string Nit { get; set; } = string.Empty;
     public string? Telefono { get; set; }
     public string? Direccion { get; set; }
+    public double? Latitud { get; set; }
+    public double? Longitud { get; set; }
 }
 
 public class CrearClienteRequest
@@ -77,6 +79,12 @@ public class CrearClienteRequest
 
     [MaxLength(200)]
     public string? Direccion { get; set; }
+
+    [Range(-90, 90)]
+    public double? Latitud { get; set; }
+
+    [Range(-180, 180)]
+    public double? Longitud { get; set; }
 }
 
 public class AlmacenDto
@@ -86,6 +94,8 @@ public class AlmacenDto
     public string Tipo { get; set; } = string.Empty;
     public string Ciudad { get; set; } = string.Empty;
     public string? Direccion { get; set; }
+    public double? Latitud { get; set; }
+    public double? Longitud { get; set; }
 }
 
 public class TipoCargaDto

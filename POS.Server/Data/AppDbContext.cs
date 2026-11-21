@@ -74,6 +74,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.Nit).HasMaxLength(30).IsRequired();
             e.Property(x => x.Telefono).HasMaxLength(25);
             e.Property(x => x.Direccion).HasMaxLength(200);
+            e.Property(x => x.Latitud).HasPrecision(9, 6);
+            e.Property(x => x.Longitud).HasPrecision(9, 6);
             e.HasIndex(x => x.Nit).IsUnique();
         });
 
@@ -86,6 +88,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.Tipo).HasMaxLength(30).IsRequired();
             e.Property(x => x.Ciudad).HasMaxLength(80).IsRequired();
             e.Property(x => x.Direccion).HasMaxLength(200);
+            e.Property(x => x.Latitud).HasPrecision(9, 6);
+            e.Property(x => x.Longitud).HasPrecision(9, 6);
             e.HasIndex(x => x.Nombre).IsUnique();
         });
 
@@ -197,6 +201,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.IdHitoActual).HasDefaultValue(1);
             e.Property(x => x.Destinatario).HasMaxLength(120).IsRequired();
             e.Property(x => x.DireccionDestino).HasMaxLength(200).IsRequired();
+            e.Property(x => x.LatitudDestino).HasPrecision(9, 6);
+            e.Property(x => x.LongitudDestino).HasPrecision(9, 6);
+            e.Property(x => x.DistanciaEstimadaKm).HasPrecision(10, 2);
             e.Property(x => x.PesoKg).HasPrecision(10, 2);
             e.Property(x => x.VolumenM3).HasPrecision(10, 3);
             e.Property(x => x.FechaRegistro).HasColumnType("datetime2(0)").HasDefaultValueSql("SYSDATETIME()");

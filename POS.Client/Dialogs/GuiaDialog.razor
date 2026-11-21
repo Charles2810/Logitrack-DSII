@@ -30,7 +30,7 @@
                     </MudSelect>
                 </MudItem>
                 <MudItem xs="12" sm="6">
-                    <MudSelect T="int" @bind-Value="_idAlmacen" Label="Almacén de origen" Variant="Variant.Outlined"
+                    <MudSelect T="int" Value="_idAlmacen" ValueChanged="OnAlmacenChanged" Label="Almacén de origen" Variant="Variant.Outlined"
                                AnchorOrigin="Origin.BottomCenter" Required="true">
                         @foreach (var a in _cat.Almacenes)
                         {
@@ -66,6 +66,22 @@
                 <MudItem xs="12" sm="6">
                     <MudTextField @bind-Value="_direccion" Label="Dirección de destino" Variant="Variant.Outlined"
                                   MaxLength="200" Required="true" />
+                </MudItem>
+                <MudItem xs="6" sm="3">
+                    <MudNumericField T="double?" Value="_latitudDestino" ValueChanged="OnLatitudChanged"
+                                     Label="Latitud destino" Variant="Variant.Outlined" Format="F6" Min="-90" Max="90" />
+                </MudItem>
+                <MudItem xs="6" sm="3">
+                    <MudNumericField T="double?" Value="_longitudDestino" ValueChanged="OnLongitudChanged"
+                                     Label="Longitud destino" Variant="Variant.Outlined" Format="F6" Min="-180" Max="180" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudText Typo="Typo.caption" Color="Color.Surface" Style="color:#0B6E4F;font-weight:600;">
+                        Ubicación de entrega · haga clic en el mapa para fijar el destino
+                    </MudText>
+                    <MapaRutas @ref="_mapa" Ruta="_rutaMapa" Seleccionable="true"
+                               OnCoordenadasSeleccionadas="AlSeleccionarCoordenadas"
+                               LatitudCentro="-17.783700" LongitudCentro="-63.180426" Zoom="13" />
                 </MudItem>
                 <MudItem xs="6" sm="3">
                     <MudNumericField T="decimal" @bind-Value="_peso" Label="Peso (kg)" Variant="Variant.Outlined"
@@ -142,8 +158,13 @@
     private List<HojaRutaDto> _hojas = new();
     private readonly List<LineaDetalle> _lineas = new();
 
+    private MapaRutas? _mapa;
+    private MapaRutaDto _rutaMapa = new();
+
     private int _idCliente;
     private int _idAlmacen;
+    private double? _latitudDestino;
+    private double? _longitudDestino;
     private int _idTipoCarga;
     private int? _idHoja;
     private string _destinatario = string.Empty;
@@ -176,6 +197,8 @@
                 _idHoja = Guia.IdHojaRuta;
                 _destinatario = Guia.Destinatario;
                 _direccion = Guia.DireccionDestino;
+                _latitudDestino = Guia.LatitudDestino.HasValue ? (double)Guia.LatitudDestino.Value : null;
+                _longitudDestino = Guia.LongitudDestino.HasValue ? (double)Guia.LongitudDestino.Value : null;
                 _peso = Guia.PesoKg;
                 _volumen = Guia.VolumenM3;
                 _autoCalcular = false;
@@ -192,6 +215,14 @@
                 _idAlmacen = _cat.Almacenes.FirstOrDefault(a => a.Tipo == "Almacén")?.IdAlmacen
                              ?? _cat.Almacenes.FirstOrDefault()?.IdAlmacen ?? 0;
                 _idTipoCarga = _cat.TiposCarga.FirstOrDefault()?.IdTipoCarga ?? 0;
+
+                var cliente = _cat.Clientes.FirstOrDefault(c => c.IdCliente == _idCliente);
+                if (cliente?.Latitud.HasValue == true && cliente.Longitud.HasValue)
+                {
+                    _latitudDestino = cliente.Latitud.Value;
+                    _longitudDestino = cliente.Longitud.Value;
+                }
+
                 AgregarLinea();
             }
         }
@@ -202,6 +233,51 @@
         finally
         {
             _cargando = false;
+            await ActualizarMapaAsync();
+        }
+    }
+
+    private Task OnAlmacenChanged(int valor)
+    {
+        _idAlmacen = valor;
+        return ActualizarMapaAsync();
+    }
+
+    private Task OnLatitudChanged(double? valor)
+    {
+        _latitudDestino = valor;
+        return ActualizarMapaAsync();
+    }
+
+    private Task OnLongitudChanged(double? valor)
+    {
+        _longitudDestino = valor;
+        return ActualizarMapaAsync();
+    }
+
+    private Task AlSeleccionarCoordenadas((double Latitud, double Longitud) punto)
+    {
+        _latitudDestino = Math.Round(punto.Latitud, 6);
+        _longitudDestino = Math.Round(punto.Longitud, 6);
+        return ActualizarMapaAsync();
+    }
+
+    private async Task ActualizarMapaAsync()
+    {
+        var almacen = _cat.Almacenes.FirstOrDefault(a => a.IdAlmacen == _idAlmacen);
+        _rutaMapa = new MapaRutaDto
+        {
+            Origen = almacen?.Latitud.HasValue == true && almacen.Longitud.HasValue
+                ? new PuntoMapaDto { Lat = almacen.Latitud.Value, Lng = almacen.Longitud.Value }
+                : null,
+            Destino = _latitudDestino.HasValue && _longitudDestino.HasValue
+                ? new PuntoMapaDto { Lat = _latitudDestino.Value, Lng = _longitudDestino.Value }
+                : null
+        };
+
+        if (_mapa != null)
+        {
+            await _mapa.ActualizarRutaAsync(_rutaMapa);
         }
     }
 
@@ -314,6 +390,8 @@
                     IdTipoCarga = _idTipoCarga,
                     Destinatario = _destinatario.Trim(),
                     DireccionDestino = _direccion.Trim(),
+                    LatitudDestino = _latitudDestino,
+                    LongitudDestino = _longitudDestino,
                     PesoKg = peso,
                     VolumenM3 = volumen,
                     Detalles = detalles
@@ -331,6 +409,8 @@
                     IdHojaRuta = _idHoja,
                     Destinatario = _destinatario.Trim(),
                     DireccionDestino = _direccion.Trim(),
+                    LatitudDestino = _latitudDestino,
+                    LongitudDestino = _longitudDestino,
                     PesoKg = peso,
                     VolumenM3 = volumen,
                     Detalles = detalles

@@ -1,0 +1,284 @@
+@page "/simulacion-rutas"
+@attribute [Authorize(Roles = "Administrador del Sistema,Administrador Logístico,Conductor/Operador,Centro de Control/Supervisor")]
+@inject ApiClient Api
+@inject ISnackbar Snackbar
+
+<PageTitle>LogiTrack Solutions · Simulación de rutas</PageTitle>
+
+<div class="d-flex justify-space-between align-center flex-wrap gap-3 mb-4">
+    <div>
+        <MudText Typo="Typo.h4" Style="font-weight:800;">Simulación de entregas</MudText>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">
+            Trazado de rutas con Leaflet + OSRM y animación de vehículos sobre coordenadas reales de Santa Cruz de la Sierra.
+        </MudText>
+    </div>
+    <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh"
+               OnClick="CargarAsync" Disabled="_cargando">Actualizar</MudButton>
+</div>
+
+@if (_cargando)
+{
+    <div class="d-flex justify-center my-10"><MudProgressCircular Indeterminate="true" /></div>
+}
+else if (_guias.Count == 0)
+{
+    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+        No hay guías con coordenadas de destino registradas. Cree una guía desde el formulario para verla aquí.
+    </MudAlert>
+}
+else
+{
+    <MudGrid>
+        <MudItem xs="12" md="4">
+            <MudPaper Elevation="2" Class="pa-4">
+                <MudText Typo="Typo.h6" Style="font-weight:700;" Class="mb-3">Envíos con ruta</MudText>
+                <MudList T="GuiaDto" Dense="true">
+                    @foreach (var guia in _guias)
+                    {
+                        <MudListItem T="GuiaDto" Value="@guia" OnClick="@(() => SeleccionarAsync(guia))"
+                                     Icon="@Icons.Material.Filled.LocalShipping"
+                                     Class="@(_seleccionada?.IdGuia == guia.IdGuia ? "mud-theme-primary" : "")">
+                            <div class="d-flex flex-column">
+                                <MudText Typo="Typo.subtitle2" Style="font-weight:700;">@guia.CodigoGuia</MudText>
+                                <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                    @guia.Destinatario · @guia.DistanciaRutaKm.ToString("N2") km
+                                </MudText>
+                                <MudChip T="string" Size="Size.Small" Color="@ColorEstado(guia.HitoActual)"
+                                         Variant="Variant.Text" Class="mt-1">@guia.HitoActual</MudChip>
+                            </div>
+                        </MudListItem>
+                    }
+                </MudList>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="8">
+            <MudPaper Elevation="2" Class="pa-4">
+                @if (_seleccionada == null)
+                {
+                    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                        Seleccione una guía de la lista para trazar y simular su entrega.
+                    </MudAlert>
+                }
+                else
+                {
+                    <div class="d-flex justify-space-between align-center flex-wrap gap-2 mb-3">
+                        <div>
+                            <MudText Typo="Typo.h5" Style="font-weight:800;">@_seleccionada.CodigoGuia</MudText>
+                            <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                                @_seleccionada.Destinatario · @_seleccionada.DireccionDestino
+                            </MudText>
+                        </div>
+                        <MudChip T="string" Color="@ColorEstado(_seleccionada.HitoActual)" Variant="Variant.Filled">
+                            @_seleccionada.HitoActual
+                        </MudChip>
+                    </div>
+
+                    <MudGrid Class="mb-3">
+                        <MudItem xs="6" sm="3">
+                            <KpiCard Titulo="Distancia" Valor="@($"{_seleccionada.DistanciaRutaKm:N2} km")"
+                                     Detalle="Estimación de ruta" Icono="@Icons.Material.Filled.Straighten"
+                                     Color="Color.Primary" />
+                        </MudItem>
+                        <MudItem xs="6" sm="3">
+                            <KpiCard Titulo="Tiempo estimado" Valor="@($"{_seleccionada.DuracionRutaMin} min")"
+                                     Detalle="ETA al destino" Icono="@Icons.Material.Filled.Schedule"
+                                     Color="Color.Secondary" />
+                        </MudItem>
+                        <MudItem xs="6" sm="3">
+                            <KpiCard Titulo="Progreso" Valor="@($"{_progreso?.Progreso ?? 0:N1}%")"
+                                     Detalle="@(_progreso == null ? "Sin iniciar" : "En ruta")"
+                                     Icono="@Icons.Material.Filled.Speed" Color="Color.Info" />
+                        </MudItem>
+                        <MudItem xs="6" sm="3">
+                            <KpiCard Titulo="Restante" Valor="@($"{_progreso?.RestanteKm ?? _seleccionada.DistanciaRutaKm:N2} km")"
+                                     Detalle="@(_progreso == null ? "Ruta completa" : $"{_progreso!.RestanteMin} min")"
+                                     Icono="@Icons.Material.Filled.Timer" Color="Color.Warning" />
+                        </MudItem>
+                    </MudGrid>
+
+                    <div class="d-flex flex-wrap align-center gap-2 mb-3">
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.PlayArrow" OnClick="IniciarAsync">
+                            Iniciar simulación
+                        </MudButton>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Warning"
+                                   StartIcon="@(_pausada ? Icons.Material.Filled.PlayArrow : Icons.Material.Filled.Pause)"
+                                   OnClick="PausarReanudarAsync" Disabled="_progreso == null">
+                            @(_pausada ? "Reanudar" : "Pausar")
+                        </MudButton>
+                        <MudButton Variant="Variant.Text" Color="Color.Default"
+                                   StartIcon="@Icons.Material.Filled.RestartAlt" OnClick="ReiniciarAsync"
+                                   Disabled="_progreso == null">Reiniciar</MudButton>
+                        <MudSelect T="int" @bind-Value="_velocidad" Label="Velocidad" Dense="true"
+                                   Variant="Variant.Outlined" Style="min-width:110px;">
+                            <MudSelectItem T="int" Value="1">1x</MudSelectItem>
+                            <MudSelectItem T="int" Value="2">2x</MudSelectItem>
+                            <MudSelectItem T="int" Value="4">4x</MudSelectItem>
+                        </MudSelect>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                            Origen: Almacén @_seleccionada.AlmacenOrigen · Destino: @_seleccionada.DireccionDestino
+                        </MudText>
+                    </div>
+
+                    <MapaRutas @ref="_mapa" Ruta="_rutaMapa" AltoGrande="true"
+                               VelocidadAnimacion="_velocidad"
+                               OnProgreso="p => OnProgreso(p)"
+                               OnAnimacionFinalizada="OnFinalizada"
+                               LatitudCentro="-17.783700" LongitudCentro="-63.180426" Zoom="13" />
+
+                    @if (_eventos.Count > 0)
+                    {
+                        <MudText Typo="Typo.subtitle1" Style="font-weight:600;" Class="mt-4">Bitácora de la simulación</MudText>
+                        <MudTimeline TimelineAlign="TimelineAlign.Start" Class="mt-2">
+                            @foreach (var evento in _eventos.AsEnumerable().Reverse())
+                            {
+                                <MudTimelineItem Color="Color.Primary" Size="Size.Small" Variant="Variant.Filled">
+                                    <ItemContent>
+                                        <MudText Typo="Typo.body2"><strong>@evento</strong></MudText>
+                                    </ItemContent>
+                                </MudTimelineItem>
+                            }
+                        </MudTimeline>
+                    }
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private bool _cargando = true;
+    private bool _pausada;
+    private int _velocidad = 1;
+    private List<GuiaDto> _guias = new();
+    private GuiaDto? _seleccionada;
+    private MapaRutas? _mapa;
+    private MapaRutaDto _rutaMapa = new();
+    private ProgresoRuta? _progreso;
+    private readonly List<string> _eventos = new();
+    private int _ultimoHitoNotificado = -1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarAsync();
+    }
+
+    private async Task CargarAsync()
+    {
+        _cargando = true;
+        try
+        {
+            var rutas = await Api.GetAsync<List<GuiaDto>>("api/rutas") ?? new List<GuiaDto>();
+            _guias = rutas.Where(g => g.TieneRuta).ToList();
+        }
+        catch (ApiException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+            _guias = new List<GuiaDto>();
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    private async Task SeleccionarAsync(GuiaDto guia)
+    {
+        _seleccionada = guia;
+        _progreso = null;
+        _pausada = false;
+        _eventos.Clear();
+        _ultimoHitoNotificado = -1;
+        _rutaMapa = new MapaRutaDto
+        {
+            Origen = new PuntoMapaDto { Lat = guia.LatitudOrigen!.Value, Lng = guia.LongitudOrigen!.Value },
+            Destino = new PuntoMapaDto { Lat = guia.LatitudDestino!.Value, Lng = guia.LongitudDestino!.Value }
+        };
+        if (_mapa != null)
+        {
+            await _mapa.ActualizarRutaAsync(_rutaMapa);
+        }
+        RegistrarEvento($"Ruta de {guia.CodigoGuia} cargada ({guia.DistanciaRutaKm:N2} km).");
+    }
+
+    private async Task IniciarAsync()
+    {
+        if (_mapa == null || _seleccionada == null) return;
+        await _mapa.IniciarAnimacionAsync();
+        _pausada = false;
+        RegistrarEvento($"Simulación iniciada para {_seleccionada.CodigoGuia}.");
+    }
+
+    private async Task PausarReanudarAsync()
+    {
+        if (_mapa == null) return;
+        if (_pausada)
+        {
+            await _mapa.ReanudarAnimacionAsync();
+            RegistrarEvento("Simulación reanudada.");
+        }
+        else
+        {
+            await _mapa.PausarAnimacionAsync();
+            RegistrarEvento("Simulación en pausa.");
+        }
+        _pausada = !_pausada;
+    }
+
+    private async Task ReiniciarAsync()
+    {
+        if (_mapa == null) return;
+        await _mapa.ReiniciarAnimacionAsync();
+        _progreso = null;
+        _pausada = false;
+        _ultimoHitoNotificado = -1;
+        _eventos.Clear();
+        RegistrarEvento("Simulación reiniciada.");
+    }
+
+    private void OnProgreso(ProgresoRuta progreso)
+    {
+        _progreso = progreso;
+        var hito = progreso.Progreso switch
+        {
+            < 15 => 0,
+            < 45 => 1,
+            < 75 => 2,
+            < 95 => 3,
+            _ => 4
+        };
+        if (hito > _ultimoHitoNotificado)
+        {
+            _ultimoHitoNotificado = hito;
+            RegistrarEvento(hito switch
+            {
+                0 => "Vehículo en almacén de origen.",
+                1 => "Salida de almacén registrada.",
+                2 => "En tránsito por la ruta asignada.",
+                3 => "Llegada al centro de distribución local.",
+                _ => "En reparto final, acercándose al destinatario."
+            });
+        }
+    }
+
+    private void OnFinalizada()
+    {
+        _progreso = null;
+        RegistrarEvento("Entrega simulada completada en el destino.");
+        Snackbar.Add("Entrega simulada completada.", Severity.Success);
+    }
+
+    private void RegistrarEvento(string mensaje)
+    {
+        _eventos.Add($"{DateTime.Now:HH:mm:ss} · {mensaje}");
+    }
+
+    private static Color ColorEstado(string estado) => estado switch
+    {
+        Hitos.Entregado => Color.Success,
+        Hitos.EnTransito or Hitos.EnRepartoFinal => Color.Info,
+        Hitos.EnCentroDistribucion or Hitos.SalidaAlmacen => Color.Warning,
+        _ => Color.Default
+    };
+}

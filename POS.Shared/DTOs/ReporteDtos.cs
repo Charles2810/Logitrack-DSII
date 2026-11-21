@@ -1,3 +1,5 @@
+using POS.Shared.Utils;
+
 namespace POS.Shared.DTOs;
 
 public class ReporteEnvioDto
@@ -35,6 +37,17 @@ public class TrazabilidadDto
     public string CodigoGuia { get; set; } = string.Empty;
     public string EstadoActual { get; set; } = string.Empty;
     public List<TrazabilidadEventoDto> Eventos { get; set; } = new();
+
+    // Datos geográficos necesarios para dibujar la ruta en el rastreo público.
+    public double? LatitudOrigen { get; set; }
+    public double? LongitudOrigen { get; set; }
+    public double? LatitudDestino { get; set; }
+    public double? LongitudDestino { get; set; }
+    public double DistanciaKm { get; set; }
+    public int DuracionEstimadaMin { get; set; }
+
+    public bool TieneMapa => GeoCalculos.SonValidas(LatitudOrigen, LongitudOrigen) &&
+                             GeoCalculos.SonValidas(LatitudDestino, LongitudDestino);
 }
 
 public class DashboardDto

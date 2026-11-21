@@ -127,6 +127,28 @@ else
                 </MudGrid>
             </MudPaper>
 
+            @if (_guia.TieneRuta)
+            {
+                <MudPaper Elevation="2" Class="pa-5 mb-4">
+                    <div class="d-flex justify-space-between align-center flex-wrap gap-2 mb-3">
+                        <div>
+                            <MudText Typo="Typo.h6" Style="font-weight:700;">
+                                <MudIcon Icon="@Icons.Material.Filled.Route" Class="mr-1" /> Ruta estimada
+                            </MudText>
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                @_guia.DistanciaRutaKm.ToString("N2") km · ETA @_guia.DuracionRutaMin min
+                            </MudText>
+                        </div>
+                        <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.PlayArrow"
+                                   OnClick="() => _mapa?.IniciarAnimacionAsync()">
+                            Simular
+                        </MudButton>
+                    </div>
+                    <MapaRutas @ref="_mapa" Ruta="_rutaMapa" />
+                </MudPaper>
+            }
+
             <MudPaper Elevation="2" Class="pa-5 mb-4">
                 <MudText Typo="Typo.h6" Style="font-weight:700;" Class="mb-3">Detalle de productos</MudText>
                 @if (_guia.Detalles == null || _guia.Detalles.Count == 0)
@@ -273,6 +295,8 @@ else
     [Parameter] public int Id { get; set; }
 
     private GuiaDto? _guia;
+    private MapaRutas? _mapa;
+    private MapaRutaDto _rutaMapa = new();
     private EntregaDto? _entrega;
     private List<CheckpointDto> _checkpoints = new();
     private List<IncidenciaDto> _incidencias = new();
@@ -292,6 +316,16 @@ else
                 _error = "Guía no encontrada.";
                 return;
             }
+
+            _rutaMapa = new MapaRutaDto
+            {
+                Origen = _guia.LatitudOrigen.HasValue && _guia.LongitudOrigen.HasValue
+                    ? new PuntoMapaDto { Lat = _guia.LatitudOrigen.Value, Lng = _guia.LongitudOrigen.Value }
+                    : null,
+                Destino = _guia.LatitudDestino.HasValue && _guia.LongitudDestino.HasValue
+                    ? new PuntoMapaDto { Lat = _guia.LatitudDestino.Value, Lng = _guia.LongitudDestino.Value }
+                    : null
+            };
 
             _checkpoints = await Api.GetAsync<List<CheckpointDto>>($"api/guias/{Id}/checkpoints") ?? new();
             _incidencias = await Api.GetAsync<List<IncidenciaDto>>($"api/guias/{Id}/incidencias") ?? new();

@@ -6,6 +6,7 @@ using POS.Server.Infrastructure;
 using POS.Shared.Constants;
 using POS.Shared.DTOs;
 using POS.Shared.Entities;
+using POS.Shared.Utils;
 
 namespace POS.Server.Controllers;
 
@@ -229,9 +230,9 @@ public class GuiasController : ControllerBase
             throw new BusinessException("No puede repetir el mismo producto en el detalle de la guía.");
         }
 
-        var almacenExiste = await _context.Almacenes
-            .AnyAsync(a => a.IdAlmacen == request.IdAlmacenOrigen);
-        if (!almacenExiste)
+        var almacen = await _context.Almacenes
+            .FirstOrDefaultAsync(a => a.IdAlmacen == request.IdAlmacenOrigen);
+        if (almacen == null)
         {
             throw new BusinessException("El almacén de origen seleccionado no existe.", 404);
         }
@@ -276,6 +277,11 @@ public class GuiasController : ControllerBase
             }
         }
 
+        var latitudOrigen = (double?)almacen.Latitud;
+        var longitudOrigen = (double?)almacen.Longitud;
+        var distanciaKm = GeoCalculos.DistanciaKm(latitudOrigen, longitudOrigen,
+            request.LatitudDestino, request.LongitudDestino);
+
         var guia = new GuiaEnvio
         {
             IdCliente = request.IdCliente,
@@ -286,6 +292,10 @@ public class GuiasController : ControllerBase
             IdUsuarioRegistro = User.GetUserId(),
             Destinatario = request.Destinatario.Trim(),
             DireccionDestino = request.DireccionDestino.Trim(),
+            LatitudDestino = request.LatitudDestino.HasValue ? (decimal)request.LatitudDestino.Value : null,
+            LongitudDestino = request.LongitudDestino.HasValue ? (decimal)request.LongitudDestino.Value : null,
+            DistanciaEstimadaKm = distanciaKm > 0 ? (decimal)distanciaKm : null,
+            DuracionEstimadaMin = distanciaKm > 0 ? GeoCalculos.DuracionEstimadaMin(distanciaKm) : null,
             PesoKg = request.PesoKg,
             VolumenM3 = request.VolumenM3,
             Detalles = request.Detalles.Select(d => new DetalleGuia
@@ -326,11 +336,23 @@ public class GuiasController : ControllerBase
             throw new BusinessException("Una guía entregada no puede modificarse (RNF05).");
         }
 
+        var almacen = await _context.Almacenes
+            .FirstOrDefaultAsync(a => a.IdAlmacen == request.IdAlmacenOrigen)
+            ?? throw new BusinessException("El almacén de origen seleccionado no existe.", 404);
+
         guia.IdCliente = request.IdCliente;
         guia.IdAlmacenOrigen = request.IdAlmacenOrigen;
         guia.IdTipoCarga = request.IdTipoCarga;
         guia.Destinatario = request.Destinatario.Trim();
         guia.DireccionDestino = request.DireccionDestino.Trim();
+        guia.LatitudDestino = request.LatitudDestino.HasValue ? (decimal)request.LatitudDestino.Value : null;
+        guia.LongitudDestino = request.LongitudDestino.HasValue ? (decimal)request.LongitudDestino.Value : null;
+
+        var distanciaKm = GeoCalculos.DistanciaKm((double?)almacen.Latitud, (double?)almacen.Longitud,
+            request.LatitudDestino, request.LongitudDestino);
+        guia.DistanciaEstimadaKm = distanciaKm > 0 ? (decimal)distanciaKm : null;
+        guia.DuracionEstimadaMin = distanciaKm > 0 ? GeoCalculos.DuracionEstimadaMin(distanciaKm) : null;
+
         guia.PesoKg = request.PesoKg;
         guia.VolumenM3 = request.VolumenM3;
 

@@ -59,6 +59,12 @@ public class Cliente
 
     [Column("direccion")]
     public string? Direccion { get; set; }
+
+    [Column("latitud")]
+    public decimal? Latitud { get; set; }
+
+    [Column("longitud")]
+    public decimal? Longitud { get; set; }
 }
 
 [Table("almacen")]
@@ -78,6 +84,12 @@ public class Almacen
 
     [Column("direccion")]
     public string? Direccion { get; set; }
+
+    [Column("latitud")]
+    public decimal? Latitud { get; set; }
+
+    [Column("longitud")]
+    public decimal? Longitud { get; set; }
 }
 
 [Table("tipo_carga")]
@@ -230,6 +242,18 @@ public class GuiaEnvio
 
     [Column("direccion_destino")]
     public string DireccionDestino { get; set; } = string.Empty;
+
+    [Column("latitud_destino")]
+    public decimal? LatitudDestino { get; set; }
+
+    [Column("longitud_destino")]
+    public decimal? LongitudDestino { get; set; }
+
+    [Column("distancia_estimada_km")]
+    public decimal? DistanciaEstimadaKm { get; set; }
+
+    [Column("duracion_estimada_min")]
+    public int? DuracionEstimadaMin { get; set; }
 
     [Column("peso_kg")]
     public decimal PesoKg { get; set; }

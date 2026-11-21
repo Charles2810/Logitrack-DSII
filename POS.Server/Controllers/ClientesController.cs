@@ -41,7 +41,9 @@ public class ClientesController : ControllerBase
             RazonSocial = c.RazonSocial,
             Nit = c.Nit,
             Telefono = c.Telefono,
-            Direccion = c.Direccion
+            Direccion = c.Direccion,
+            Latitud = (double?)c.Latitud,
+            Longitud = (double?)c.Longitud
         }).ToListAsync());
     }
 
@@ -59,7 +61,9 @@ public class ClientesController : ControllerBase
             RazonSocial = request.RazonSocial.Trim(),
             Nit = request.Nit.Trim(),
             Telefono = string.IsNullOrWhiteSpace(request.Telefono) ? null : request.Telefono.Trim(),
-            Direccion = string.IsNullOrWhiteSpace(request.Direccion) ? null : request.Direccion.Trim()
+            Direccion = string.IsNullOrWhiteSpace(request.Direccion) ? null : request.Direccion.Trim(),
+            Latitud = request.Latitud.HasValue ? (decimal)request.Latitud.Value : null,
+            Longitud = request.Longitud.HasValue ? (decimal)request.Longitud.Value : null
         };
 
         _context.Clientes.Add(cliente);
@@ -84,6 +88,8 @@ public class ClientesController : ControllerBase
         cliente.Nit = request.Nit.Trim();
         cliente.Telefono = string.IsNullOrWhiteSpace(request.Telefono) ? null : request.Telefono.Trim();
         cliente.Direccion = string.IsNullOrWhiteSpace(request.Direccion) ? null : request.Direccion.Trim();
+        cliente.Latitud = request.Latitud.HasValue ? (decimal)request.Latitud.Value : null;
+        cliente.Longitud = request.Longitud.HasValue ? (decimal)request.Longitud.Value : null;
 
         await _context.SaveChangesAsync();
         return Ok(ToDto(cliente));
@@ -112,6 +118,8 @@ public class ClientesController : ControllerBase
         RazonSocial = c.RazonSocial,
         Nit = c.Nit,
         Telefono = c.Telefono,
-        Direccion = c.Direccion
+        Direccion = c.Direccion,
+        Latitud = (double?)c.Latitud,
+        Longitud = (double?)c.Longitud
     };
 }

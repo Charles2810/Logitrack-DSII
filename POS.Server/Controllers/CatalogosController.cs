@@ -39,7 +39,9 @@ public class CatalogosController : ControllerBase
                     Nombre = a.Nombre,
                     Tipo = a.Tipo,
                     Ciudad = a.Ciudad,
-                    Direccion = a.Direccion
+                    Direccion = a.Direccion,
+                    Latitud = (double?)a.Latitud,
+                    Longitud = (double?)a.Longitud
                 })
                 .ToListAsync(),
 
@@ -66,7 +68,9 @@ public class CatalogosController : ControllerBase
                     RazonSocial = c.RazonSocial,
                     Nit = c.Nit,
                     Telefono = c.Telefono,
-                    Direccion = c.Direccion
+                    Direccion = c.Direccion,
+                    Latitud = (double?)c.Latitud,
+                    Longitud = (double?)c.Longitud
                 })
                 .ToListAsync(),
 

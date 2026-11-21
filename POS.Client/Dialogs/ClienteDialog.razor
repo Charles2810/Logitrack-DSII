@@ -14,7 +14,26 @@
                       Required="true" Class="mb-3" />
         <MudTextField @bind-Value="_telefono" Label="Teléfono" Variant="Variant.Outlined" MaxLength="25"
                       Class="mb-3" />
-        <MudTextField @bind-Value="_direccion" Label="Dirección" Variant="Variant.Outlined" MaxLength="200" />
+        <MudTextField @bind-Value="_direccion" Label="Dirección" Variant="Variant.Outlined" MaxLength="200" Class="mb-3" />
+
+        <MudGrid>
+            <MudItem xs="6" sm="3">
+                <MudNumericField T="double?" Value="_latitud" ValueChanged="OnLatitudChanged"
+                                 Label="Latitud" Variant="Variant.Outlined" Format="F6" Min="-90" Max="90" />
+            </MudItem>
+            <MudItem xs="6" sm="3">
+                <MudNumericField T="double?" Value="_longitud" ValueChanged="OnLongitudChanged"
+                                 Label="Longitud" Variant="Variant.Outlined" Format="F6" Min="-180" Max="180" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudText Typo="Typo.caption" Style="color:#0B6E4F;font-weight:600;">
+                    Ubicación del cliente · haga clic en el mapa para fijarla
+                </MudText>
+                <MapaRutas @ref="_mapa" Ruta="_rutaMapa" Seleccionable="true"
+                           OnCoordenadasSeleccionadas="AlSeleccionarCoordenadas"
+                           LatitudCentro="-17.783700" LongitudCentro="-63.180426" Zoom="13" />
+            </MudItem>
+        </MudGrid>
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="Cancelar" Variant="Variant.Text">Cancelar</MudButton>
@@ -41,6 +60,10 @@
     private string _nit = string.Empty;
     private string? _telefono;
     private string? _direccion;
+    private double? _latitud;
+    private double? _longitud;
+    private MapaRutas? _mapa;
+    private MapaRutaDto _rutaMapa = new();
     private bool _guardando;
     private string? _error;
 
@@ -52,6 +75,44 @@
             _nit = Cliente.Nit;
             _telefono = Cliente.Telefono;
             _direccion = Cliente.Direccion;
+            _latitud = Cliente.Latitud;
+            _longitud = Cliente.Longitud;
+            _rutaMapa = CrearRuta();
+        }
+    }
+
+    private MapaRutaDto CrearRuta() => new()
+    {
+        Origen = _latitud.HasValue && _longitud.HasValue
+            ? new PuntoMapaDto { Lat = _latitud.Value, Lng = _longitud.Value }
+            : null
+    };
+
+    private Task OnLatitudChanged(double? valor)
+    {
+        _latitud = valor;
+        return ActualizarMapaAsync();
+    }
+
+    private Task OnLongitudChanged(double? valor)
+    {
+        _longitud = valor;
+        return ActualizarMapaAsync();
+    }
+
+    private Task AlSeleccionarCoordenadas((double Latitud, double Longitud) punto)
+    {
+        _latitud = Math.Round(punto.Latitud, 6);
+        _longitud = Math.Round(punto.Longitud, 6);
+        return ActualizarMapaAsync();
+    }
+
+    private async Task ActualizarMapaAsync()
+    {
+        _rutaMapa = CrearRuta();
+        if (_mapa != null)
+        {
+            await _mapa.ActualizarRutaAsync(_rutaMapa);
         }
     }
 
@@ -73,7 +134,9 @@
                 RazonSocial = _razonSocial.Trim(),
                 Nit = _nit.Trim(),
                 Telefono = string.IsNullOrWhiteSpace(_telefono) ? null : _telefono.Trim(),
-                Direccion = string.IsNullOrWhiteSpace(_direccion) ? null : _direccion.Trim()
+                Direccion = string.IsNullOrWhiteSpace(_direccion) ? null : _direccion.Trim(),
+                Latitud = _latitud,
+                Longitud = _longitud
             };
 
             if (Edicion && Cliente != null)
