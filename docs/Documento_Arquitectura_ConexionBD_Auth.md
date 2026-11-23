@@ -267,42 +267,42 @@ A continuación se presentan las capturas de pantalla de la ejecución de las pr
 #### 1. Registro Exitoso de Usuario (`POST /api/auth/registro` — Status 201 Created)
 Se envía la solicitud con los datos del usuario (`Charles Estudiante UPDS`). El servidor procesa el hash con BCrypt, persiste la entidad mediante el patrón Repositorio y retorna el código HTTP `201 Created` junto con el token JWT inicial y el identificador asignado:
 
-![Registro de Usuario Nuevo Exitoso](./docs/images/captura_01_registro_201_created.jpg)
+![Registro de Usuario Nuevo Exitoso](./images/captura_01_registro_201_created.jpg)
 
 ---
 
 #### 2. Inicio de Sesión Exitoso (`POST /api/auth/login` — Status 200 OK)
 Se autentican las credenciales del usuario recién registrado. El servicio valida el hash con BCrypt y retorna el código HTTP `200 OK` con un nuevo token de sesión Bearer:
 
-![Inicio de Sesión Exitoso](./docs/images/captura_02_login_200_ok.jpg)
+![Inicio de Sesión Exitoso](./images/captura_02_login_200_ok.jpg)
 
 ---
 
 #### 3. Consulta de Perfil Protegido (`GET /api/auth/me` — Status 200 OK)
 Se invoca el endpoint protegido enviando el encabezado `Authorization: Bearer <token>`. El middleware de autenticación valida la firma criptográfica y retorna `200 OK` con los datos de sesión y el rol del usuario:
 
-![Consulta de Perfil Protegido Me](./docs/images/captura_03_consulta_me_200_ok.jpg)
+![Consulta de Perfil Protegido Me](./images/captura_03_consulta_me_200_ok.jpg)
 
 ---
 
 #### 4. Control de Error por Contraseña Incorrecta (`POST /api/auth/login` — Status 401 Unauthorized)
 Se valida la seguridad ante credenciales inválidas. El servidor rechaza la autenticación de forma segura con el código HTTP `401 Unauthorized` y un mensaje controlado:
 
-![Error de Login 401 Unauthorized](./docs/images/captura_04_error_login_401.png)
+![Error de Login 401 Unauthorized](./images/captura_04_error_login_401.png)
 
 ---
 
 #### 5. Validación de Regla de Negocio por Correo Duplicado (`POST /api/auth/registro` — Status 400 Bad Request)
 Se comprueba el control de integridad al intentar registrar un correo ya existente. El repositorio detecta la duplicidad y el middleware de errores responde con `400 Bad Request`:
 
-![Error Correo Duplicado 400 Bad Request](./docs/images/captura_05_error_duplicado_400.png)
+![Error Correo Duplicado 400 Bad Request](./images/captura_05_error_duplicado_400.png)
 
 ---
 
 #### 6. Resumen General: Collection Runner (10 de 10 Pruebas Aprobadas)
 Ejecución automatizada de la suite completa en el **Runner** de Postman: **10 aserciones pasadas en verde (`All 10 Passed`, 0 Failed, 0 Errors)** con un tiempo promedio de 99 ms:
 
-![Resumen de Pruebas Postman Runner](./docs/images/captura_00_runner_pruebas_exitosas.jpg)
+![Resumen de Pruebas Postman Runner](./images/captura_00_runner_pruebas_exitosas.jpg)
 
 ---
 
