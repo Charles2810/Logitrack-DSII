@@ -38,3 +38,8 @@ postman/
 # Evitar subir secretos en caso de crearse archivos locales
 secrets.json
 appsettings.*.local.json
+
+# Node / Playwright
+node_modules/
+tests/visual/playwright-report/
+tests/visual/test-results/

@@ -62,7 +62,7 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-// .NET 10: MapStaticAssets sirve los archivos del cliente (incluido _framework y _content)
+// .NET 9: MapStaticAssets sirve los archivos del cliente (incluido _framework y _content)
 // con sus rutas con huella digital. No usar UseBlazorFrameworkFiles/UseStaticFiles en su lugar.
 app.MapStaticAssets();
 
@@ -74,3 +74,5 @@ app.MapControllers();
 app.MapFallbackToFile("index.html");
 
 app.Run();
+
+public partial class Program { }

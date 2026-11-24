@@ -28,9 +28,44 @@ Invoke-RestMethod "$base/api/tracking/LT-00000002"
 
 | Id | Ruta | Paso y resultado esperado |
 |---|---|---|
-| M1 | `/rastreo?codigo=LT-00000002` | Mapa con Almacén Central → Av. Cristo Redentor 250, ruta trazada y `2.7 km / 12 min`. |
+| M1 | `/rastreo` | Ingresar `LT-00000002` y clic en Rastrear: mapa con Almacén Central → Av. Cristo Redentor 250, ruta trazada y `2.7 km / 12 min`. |
 | M2 | `/simulacion-rutas` | Seleccionar `LT-00000002`; Iniciar, Pausa, Reanudar, Reiniciar y 4x; la bitácora registra los hitos. |
 | M3 | `/guias` → Nueva | Clic en el mapa fija latitud/longitud; al guardar, el detalle muestra la ruta estimada. |
 | M4 | `/clientes` → Editar | El mapa muestra la coordenada guardada del cliente. |
 
 > El trazado usa OSRM; si no responde, cae a la ruta estimada. La simulación es solo visual: no modifica la BD.
+
+## Pruebas integradas automatizadas (.NET)
+
+`POS.Tests` contiene 6 pruebas xUnit con `WebApplicationFactory`: validan rutas, tracking, autorización, recursos visuales y el CRUD de conductores (alta, edición y baja lógica; usa `conductor.tests@logitrack.test` y limpia lo que crea).
+
+```powershell
+cd 'C:\Users\IdeaPad Gaming 3\Documents\Proyecto\Logitrack-DSII'
+dotnet test POS.slnx --nologo
+```
+
+> La solución apunta a `net9.0`, por lo que el Explorador de pruebas de Visual Studio 17.x detecta y ejecuta `POS.Tests` correctamente. También funciona `dotnet test POS.Tests/POS.Tests.csproj --nologo`. Para volver a `net10.0` se requiere Visual Studio 18.0 o superior. La BD debe estar recreada con `database.sql` y la app puede estar detenida: el host de pruebas se levanta en memoria.
+
+## Pruebas visuales automatizadas (Playwright + Edge)
+
+Requisitos: Node 20+ y Microsoft Edge instalado. Las pruebas usan `channel: 'msedge'`, `baseURL=http://localhost:5163` y `webServer`: inician la app si no está corriendo y reutilizan una instancia existente. La respuesta de OSRM se simula en `specs/osrm.ts` para que el trazado sea determinista y no dependa de internet.
+
+```powershell
+cd 'C:\Users\IdeaPad Gaming 3\Documents\Proyecto\Logitrack-DSII\tests\visual'
+npm install
+npm test
+```
+
+Cobertura:
+
+- `rastreo.spec.ts`: rastreo público de `LT-00000002`, estado `En Tránsito`, mapa, `2.70 km` y `12 min`.
+- `simulacion.spec.ts`: selección de guía, Iniciar/Pausar/Reanudar/Reiniciar y mapa visible.
+- `conductores.spec.ts`: formulario nuevo, validación de contraseña inicial y cancelación sin mutar la BD.
+
+Resultados:
+
+```powershell
+npm run report
+```
+
+El reporte HTML queda en `tests\visual\playwright-report` y las capturas en `tests\visual\test-results` (ambos ignorados por Git). También se puede abrir la UI interactiva con `npm run test:ui`.

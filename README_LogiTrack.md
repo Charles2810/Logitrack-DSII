@@ -33,12 +33,12 @@ Navegador
 
 | Componente | Tecnología |
 |---|---|
-| Frontend | Blazor WebAssembly, .NET 10, MudBlazor 9.12.0 |
-| Backend | ASP.NET Core Web API, .NET 10 |
+| Frontend | Blazor WebAssembly, .NET 9, MudBlazor 9.12.0 |
+| Backend | ASP.NET Core Web API, .NET 9 |
 | Base de datos | Microsoft SQL Server 2019 o superior |
 | Autenticación | JWT Bearer + BCrypt para contraseñas |
 | Acceso a datos | Entity Framework Core (solo lectura/escritura, sin migraciones) |
-| Pruebas de API | Postman v2.1 |
+| Pruebas | Postman v2.1, xUnit, Playwright |
 
 ---
 
@@ -74,7 +74,7 @@ POS/
 ## 3. Requisitos previos
 
 1. **SQL Server 2019 o superior** (Express, Developer o Standard), con autenticación de Windows habilitada.
-2. **.NET SDK 10.0** o superior. Verificar con:
+2. **.NET SDK 9.0** o superior. Verificar con:
 
    ```powershell
    dotnet --version
@@ -84,7 +84,7 @@ POS/
 4. **Postman** (opcional, para ejecutar la colección de pruebas).
 5. Navegador moderno (Chrome, Edge o Firefox).
 
-> El proyecto apunta a `net10.0`. Si se usa una versión anterior del SDK, cambiar el `TargetFramework` de los tres proyectos o instalar .NET 10.
+> El proyecto apunta a `net9.0` para que el Explorador de pruebas funcione con Visual Studio 17.x. Para apuntar a `net10.0` se requiere Visual Studio 18.0 o superior.
 
 ---
 
