@@ -21,6 +21,7 @@
     { "key": "idProducto", "value": "1" },
     { "key": "idVehiculo", "value": "1" },
     { "key": "idUsuarioNuevo", "value": "8" },
+    { "key": "idConductorNuevo", "value": "9" },
     { "key": "idIncidencia", "value": "1" },
     { "key": "idEntrega", "value": "1" },
     { "key": "idMovimiento", "value": "1" },
@@ -1703,6 +1704,146 @@
               "path": ["api", "guias", "{{idGuiaEliminar}}"]
             },
             "description": "Solo guías en hito Registrada sin checkpoints, incidencias, entregas, movimientos ni notificaciones; si no, responde 409 (RNF05). Rol: Administrador Logístico."
+          }
+        }
+      ]
+    },
+    {
+      "name": "18 Conductores (CRUD)",
+      "item": [
+        {
+          "name": "Listar conductores",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminSistema}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/conductores",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "conductores"]
+            },
+            "description": "Solo Administrador del Sistema. Devuelve los usuarios con rol Conductor/Operador."
+          }
+        },
+        {
+          "name": "Listar conductores activos (filtro)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminSistema}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/conductores?activo=true&buscar=",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "conductores"],
+              "query": [
+                { "key": "activo", "value": "true" },
+                { "key": "buscar", "value": "" }
+              ]
+            },
+            "description": "Filtros opcionales activo=true|false y buscar=texto."
+          }
+        },
+        {
+          "name": "Obtener conductor por id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminSistema}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/conductores/3",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "conductores", "3"]
+            },
+            "description": "Conductor demo 3: Carlos Soliz."
+          }
+        },
+        {
+          "name": "Crear conductor (guarda idConductorNuevo)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const ok = pm.response.code === 201;",
+                  "pm.test('Conductor creado (201)', () => pm.expect(ok).to.be.true);",
+                  "if (ok) { pm.collectionVariables.set('idConductorNuevo', String(pm.response.json().idConductor)); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminSistema}}", "type": "string" }] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreCompleto\": \"Conductor Postman\",\n  \"correo\": \"conductor.postman@logitrack.test\",\n  \"password\": \"{{passwordDemo}}\",\n  \"activo\": true\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/conductores",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "conductores"]
+            },
+            "description": "Fuerza el rol Conductor/Operador. Si se ejecuta dos veces falla por correo duplicado (409)."
+          }
+        },
+        {
+          "name": "Actualizar conductor",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminSistema}}", "type": "string" }] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreCompleto\": \"Conductor Postman Editado\",\n  \"correo\": \"conductor.postman@logitrack.test\",\n  \"activo\": true\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/conductores/{{idConductorNuevo}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "conductores", "{{idConductorNuevo}}"]
+            },
+            "description": "Edita nombre, correo y estado; el rol no se puede cambiar desde este CRUD."
+          }
+        },
+        {
+          "name": "Activar / desactivar conductor",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminSistema}}", "type": "string" }] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activo\": false\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/conductores/{{idConductorNuevo}}/estado",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "conductores", "{{idConductorNuevo}}", "estado"]
+            },
+            "description": "RN11: los conductores no se eliminan, solo se activan o desactivan."
+          }
+        },
+        {
+          "name": "Restablecer contraseña del conductor",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenAdminSistema}}", "type": "string" }] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password\": \"OtraClave2026!\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/conductores/{{idConductorNuevo}}/reset-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "conductores", "{{idConductorNuevo}}", "reset-password"]
+            },
+            "description": "El Administrador del Sistema puede restablecer la contraseña del conductor."
           }
         }
       ]

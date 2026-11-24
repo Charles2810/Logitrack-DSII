@@ -486,6 +486,21 @@ Invoke-RestMethod "http://localhost:5163/api/tracking/LT-00000001"
 | PATCH | `/api/usuarios/{id}/estado` | Administrador del Sistema | Activa/desactiva |
 | POST | `/api/usuarios/{id}/reset-password` | Administrador del Sistema | Restablece contraseña |
 
+### 9.12.1 Conductores (CRUD)
+
+CRUD específico del rol `Conductor/Operador`, implementado sobre `dbo.usuario` sin baja física (RN11).
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| GET | `/api/conductores?activo=&buscar=` | Administrador del Sistema | Listado filtrable |
+| GET | `/api/conductores/{id}` | Administrador del Sistema | Detalle |
+| POST | `/api/conductores` | Administrador del Sistema | Alta; fuerza el rol Conductor/Operador |
+| PUT | `/api/conductores/{id}` | Administrador del Sistema | Edición de nombre, correo y estado |
+| PATCH | `/api/conductores/{id}/estado` | Administrador del Sistema | Activa/desactiva; no elimina el registro |
+| POST | `/api/conductores/{id}/reset-password` | Administrador del Sistema | Restablece la contraseña |
+
+Pantalla Blazor: `/conductores` (menú Administración del Sistema → Conductores), con formulario en línea para alta y edición, filtros de búsqueda/estado y acciones de baja lógica y restablecimiento de contraseña. Peticiones Postman: carpeta `18 Conductores (CRUD)`. Todas requieren `Authorization: Bearer {{tokenAdminSistema}}`.
+
 ### 9.13 Clientes, productos y vehículos
 
 | Método | Ruta | Acceso |

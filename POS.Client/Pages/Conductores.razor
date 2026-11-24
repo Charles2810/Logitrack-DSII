@@ -1,0 +1,302 @@
+@page "/conductores"
+@attribute [Authorize(Roles = "Administrador del Sistema")]
+@inject ApiClient Api
+@inject CatalogosService Catalogos
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>LogiTrack Solutions · Conductores</PageTitle>
+
+<div class="d-flex justify-space-between align-center flex-wrap gap-3 mb-4">
+    <div>
+        <MudText Typo="Typo.h4" Style="font-weight:800;">Conductores</MudText>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">
+            Altas, ediciones, baja lógica y credenciales del personal de conducción.
+        </MudText>
+    </div>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd"
+               OnClick="Nuevo">Nuevo conductor</MudButton>
+</div>
+
+@if (_mostrarFormulario)
+{
+    <MudPaper Elevation="3" Class="pa-4 mb-4">
+        <div class="d-flex justify-space-between align-center mb-3">
+            <MudText Typo="Typo.h6" Style="font-weight:700;">
+                @(_editando ? "Editar conductor" : "Nuevo conductor")
+            </MudText>
+            <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="Cancelar"
+                           title="Cerrar formulario" />
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mb-4">@_error</MudAlert>
+        }
+
+        <div class="d-flex flex-wrap gap-3">
+            <MudTextField @bind-Value="_nombreCompleto" Label="Nombre completo" Variant="Variant.Outlined"
+                          MaxLength="120" Required="true" Style="min-width:260px; flex:1;" />
+            <MudTextField @bind-Value="_correo" Label="Correo electrónico" Variant="Variant.Outlined"
+                          InputType="InputType.Email" MaxLength="120" Required="true"
+                          Style="min-width:260px; flex:1;" />
+            @if (!_editando)
+            {
+                <MudTextField @bind-Value="_password" Label="Contraseña inicial" Variant="Variant.Outlined"
+                              InputType="@(_verPassword ? InputType.Text : InputType.Password)"
+                              Adornment="Adornment.End"
+                              AdornmentIcon="@(_verPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                              OnAdornmentClick="@(() => _verPassword = !_verPassword)"
+                              HelperText="Mínimo 8 caracteres." Required="true" Style="min-width:260px; flex:1;" />
+            }
+        </div>
+
+        <div class="d-flex justify-space-between align-center flex-wrap gap-3 mt-3">
+            <MudSwitch @bind-Value="_activo" Color="Color.Primary" Label="Conductor activo" />
+            <div class="d-flex gap-2">
+                <MudButton OnClick="Cancelar" Variant="Variant.Text">Cancelar</MudButton>
+                <MudButton OnClick="GuardarAsync" Variant="Variant.Filled" Color="Color.Primary"
+                           Disabled="_guardando">
+                    @if (_guardando)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" Color="Color.Inherit" />
+                    }
+                    @(_editando ? "Guardar cambios" : "Crear conductor")
+                </MudButton>
+            </div>
+        </div>
+    </MudPaper>
+}
+
+<MudPaper Elevation="2" Class="pa-4 mb-4">
+    <div class="d-flex gap-2 align-center flex-wrap">
+        <MudTextField @bind-Value="_buscar" Label="Buscar por nombre o correo" Variant="Variant.Outlined"
+                      Immediate="true" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                      DebounceInterval="400" OnDebounceIntervalElapsed="@(_ => CargarAsync())"
+                      Style="min-width:300px;" />
+        <MudSelect T="string" @bind-Value="_estadoFiltro" @bind-Value:after="CargarAsync" Label="Estado"
+                   Variant="Variant.Outlined" Clearable="true" AnchorOrigin="Origin.BottomCenter"
+                   Style="max-width:200px;">
+            <MudSelectItem T="string" Value="@FiltroActivos">Activos</MudSelectItem>
+            <MudSelectItem T="string" Value="@FiltroInactivos">Inactivos</MudSelectItem>
+        </MudSelect>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh"
+                   OnClick="CargarAsync">Actualizar</MudButton>
+    </div>
+</MudPaper>
+
+<MudPaper Elevation="2">
+    <MudTable Items="_items" Loading="_cargando" Dense="true" Hover="true" Striped="true" Breakpoint="Breakpoint.Sm">
+        <HeaderContent>
+            <MudTh>Nombre</MudTh>
+            <MudTh>Correo</MudTh>
+            <MudTh>Estado</MudTh>
+            <MudTh>Creado</MudTh>
+            <MudTh align="Right">Acciones</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd><b>@context.NombreCompleto</b></MudTd>
+            <MudTd>@context.Correo</MudTd>
+            <MudTd>
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Filled"
+                         Color="@(context.Activo ? Color.Success : Color.Error)">
+                    @(context.Activo ? "Activo" : "Inactivo")
+                </MudChip>
+            </MudTd>
+            <MudTd>@context.FechaCreacion.ToLocalTime().ToString("dd/MM/yyyy")</MudTd>
+            <MudTd align="Right">
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
+                               title="Editar" OnClick="@(() => Editar(context))" />
+                <MudIconButton Icon="@Icons.Material.Filled.Key" Size="Size.Small" Color="Color.Warning"
+                               title="Restablecer contraseña" OnClick="@(() => ResetPasswordAsync(context))" />
+                <MudIconButton Icon="@(context.Activo ? Icons.Material.Filled.Block : Icons.Material.Filled.CheckCircle)"
+                               Size="Size.Small" Color="@(context.Activo ? Color.Error : Color.Success)"
+                               title="@(context.Activo ? "Inhabilitar" : "Habilitar")"
+                               OnClick="@(() => CambiarEstadoAsync(context))" />
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Typo="Typo.body2" Class="mud-text-secondary py-4">
+                No se encontraron conductores con los filtros aplicados.
+            </MudText>
+        </NoRecordsContent>
+    </MudTable>
+</MudPaper>
+
+@code {
+    private List<ConductorDto> _items = new();
+    private string? _buscar;
+    private string? _estadoFiltro;
+    private const string FiltroActivos = "activos";
+    private const string FiltroInactivos = "inactivos";
+    private bool _cargando = true;
+
+    private bool _mostrarFormulario;
+    private bool _editando;
+    private bool _guardando;
+    private bool _verPassword;
+    private int _idEditando;
+    private string _nombreCompleto = string.Empty;
+    private string _correo = string.Empty;
+    private string _password = string.Empty;
+    private bool _activo = true;
+    private string? _error;
+
+    protected override Task OnInitializedAsync() => CargarAsync();
+
+    private async Task CargarAsync()
+    {
+        _cargando = true;
+        try
+        {
+            var query = new List<string>();
+            if (!string.IsNullOrWhiteSpace(_buscar)) query.Add($"buscar={Uri.EscapeDataString(_buscar.Trim())}");
+            if (_estadoFiltro == "activos") query.Add("activo=true");
+            if (_estadoFiltro == "inactivos") query.Add("activo=false");
+
+            var url = "api/conductores" + (query.Count > 0 ? "?" + string.Join("&", query) : string.Empty);
+            _items = await Api.GetAsync<List<ConductorDto>>(url) ?? new();
+        }
+        catch (ApiException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    private void Nuevo()
+    {
+        _editando = false;
+        _idEditando = 0;
+        _nombreCompleto = string.Empty;
+        _correo = string.Empty;
+        _password = string.Empty;
+        _activo = true;
+        _verPassword = false;
+        _error = null;
+        _mostrarFormulario = true;
+    }
+
+    private void Editar(ConductorDto conductor)
+    {
+        _editando = true;
+        _idEditando = conductor.IdConductor;
+        _nombreCompleto = conductor.NombreCompleto;
+        _correo = conductor.Correo;
+        _activo = conductor.Activo;
+        _password = string.Empty;
+        _error = null;
+        _mostrarFormulario = true;
+    }
+
+    private void Cancelar()
+    {
+        _mostrarFormulario = false;
+        _error = null;
+    }
+
+    private async Task GuardarAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_nombreCompleto) || string.IsNullOrWhiteSpace(_correo))
+        {
+            _error = "Complete el nombre y el correo del conductor.";
+            return;
+        }
+
+        if (!_editando && string.IsNullOrWhiteSpace(_password))
+        {
+            _error = "Defina una contraseña inicial.";
+            return;
+        }
+
+        _guardando = true;
+        _error = null;
+
+        try
+        {
+            if (_editando)
+            {
+                await Api.PutAsync<ConductorDto>($"api/conductores/{_idEditando}", new ActualizarConductorRequest
+                {
+                    NombreCompleto = _nombreCompleto.Trim(),
+                    Correo = _correo.Trim(),
+                    Activo = _activo
+                });
+
+                Snackbar.Add("Conductor actualizado correctamente.", Severity.Success);
+            }
+            else
+            {
+                await Api.PostAsync<ConductorDto>("api/conductores", new CrearConductorRequest
+                {
+                    NombreCompleto = _nombreCompleto.Trim(),
+                    Correo = _correo.Trim(),
+                    Password = _password,
+                    Activo = _activo
+                });
+
+                Snackbar.Add("Conductor creado correctamente.", Severity.Success);
+            }
+
+            Catalogos.Invalidar();
+            _mostrarFormulario = false;
+            await CargarAsync();
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _guardando = false;
+        }
+    }
+
+    private async Task ResetPasswordAsync(ConductorDto conductor)
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(ResetPasswordDialog.Usuario), new UsuarioDto { IdUsuario = conductor.IdConductor, NombreCompleto = conductor.NombreCompleto, Correo = conductor.Correo } },
+            { nameof(ResetPasswordDialog.Ruta), $"api/conductores/{conductor.IdConductor}/reset-password" }
+        };
+        var dialog = await DialogService.ShowAsync<ResetPasswordDialog>("Restablecer contraseña", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true });
+
+        await dialog.Result;
+    }
+
+    private async Task CambiarEstadoAsync(ConductorDto conductor)
+    {
+        var confirmar = await DialogService.ShowMessageBoxAsync(
+            conductor.Activo ? "Inhabilitar conductor" : "Habilitar conductor",
+            conductor.Activo
+                ? $"¿Desea inhabilitar a {conductor.NombreCompleto}? No se elimina: solo pasa a estado Inactivo."
+                : $"¿Desea habilitar a {conductor.NombreCompleto}?",
+            yesText: "Sí", cancelText: "No");
+
+        if (confirmar != true)
+        {
+            return;
+        }
+
+        try
+        {
+            await Api.PatchAsync<object>($"api/conductores/{conductor.IdConductor}/estado",
+                new CambiarEstadoConductorRequest { Activo = !conductor.Activo });
+
+            Snackbar.Add(conductor.Activo
+                ? "Conductor inhabilitado correctamente."
+                : "Conductor habilitado correctamente.", Severity.Success);
+
+            Catalogos.Invalidar();
+            await CargarAsync();
+        }
+        catch (ApiException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+}
