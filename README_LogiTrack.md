@@ -730,8 +730,10 @@ Invoke-RestMethod "http://localhost:5163/api/tracking/LT-00000001"
 - [x] Datos demo y siete usuarios de prueba.
 - [x] Colección Postman con 68 peticiones.
 - [x] Instrucciones de instalación, ejecución y pruebas en este documento.
-- [x] [Reporte Final de Pruebas y Corrección de Errores](docs/REPORTE_FINAL_PRUEBAS_Y_CORRECCIONES.md).
-- [x] [Manual Técnico y Manual de Usuario](docs/MANUAL_TECNICO_Y_USUARIO.md).
+- [x] [Manual Técnico](docs/entrega_final/01_MANUAL_TECNICO.md).
+- [x] [Manual de Usuario](docs/entrega_final/02_MANUAL_DE_USUARIO.md).
+- [x] [Reporte Final de Pruebas y Corrección de Errores](docs/entrega_final/03_REPORTE_FINAL_PRUEBAS_Y_CORRECCIONES.md).
+- [x] [Guion de Demostración y Defensa Oral](docs/entrega_final/04_GUION_DEMOSTRACION_DEFENSA.md).
 
 ---
 

@@ -73,8 +73,6 @@ La colección `Postman_LogiTrack.json` (17 carpetas, 68+ peticiones) y los trigg
 
 ## 5. Registro de Errores Detectados y Corregidos
 
-Durante las iteraciones de desarrollo, integración y pruebas se identificaron y resolvieron los siguientes defectos:
-
 | ID | Error detectado | Causa raíz | Solución aplicada | Referencia |
 |---|---|---|---|---|
 | **ERR-01** | Al entrar al rastreo público (`/rastreo`) estando autenticado, se perdía la sesión del usuario. | El flujo público limpiaba/reiniciaba el estado de autenticación en el cliente Blazor. | Se preservó el token JWT en `localStorage` al consultar rutas públicas sin exigir login. | Commit `01d9df0` |
