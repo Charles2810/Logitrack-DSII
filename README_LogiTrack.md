@@ -706,7 +706,7 @@ Invoke-RestMethod "http://localhost:5163/api/tracking/LT-00000001"
 | `database.sql` falla con “no se puede obtener acceso exclusivo” | Hay conexiones activas. Detener `POS.Server`, cerrar SSMS y volver a ejecutar. |
 | `Login failed for user` | Ajustar `DefaultConnection` a la instancia/usuario correctos. |
 | Error `334` al insertar | La tabla tiene triggers y EF Core debe mapearla con `HasTrigger`. Ya está configurado en `AppDbContext`; no quitar esas líneas. |
-| `dotnet run` falla por SDK | Instalar .NET SDK 10 o cambiar `TargetFramework` en los tres `.csproj`. |
+| `dotnet run` falla por SDK | Instalar .NET 9.0 (Runtime/SDK) o ajustar `TargetFramework` en los archivos `.csproj`. |
 | El puerto 5163 está ocupado | Detener el proceso anterior o ejecutar `dotnet run --project POS.Server --urls http://localhost:5170`. |
 | La interfaz no carga datos | Verificar que la API esté arriba y que el token no haya expirado (480 minutos). |
 | La página queda en blanco o sin estilos de MudBlazor | Ejecutar desde la carpeta `Plantilla` con `dotnet run --project POS.Server --launch-profile http`; no abrir `index.html` como archivo. Si persiste, `dotnet clean POS.slnx` y volver a compilar para regenerar los recursos estáticos. |
@@ -730,6 +730,8 @@ Invoke-RestMethod "http://localhost:5163/api/tracking/LT-00000001"
 - [x] Datos demo y siete usuarios de prueba.
 - [x] Colección Postman con 68 peticiones.
 - [x] Instrucciones de instalación, ejecución y pruebas en este documento.
+- [x] [Reporte Final de Pruebas y Corrección de Errores](docs/REPORTE_FINAL_PRUEBAS_Y_CORRECCIONES.md).
+- [x] [Manual Técnico y Manual de Usuario](docs/MANUAL_TECNICO_Y_USUARIO.md).
 
 ---
 
